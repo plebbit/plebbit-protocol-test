@@ -14,7 +14,6 @@ console.log(plebbitOptions)
 const pubsubIpfsClient = IpfsHttpClient.create({url: plebbitOptions.pubsubHttpClientOptions})
 const signers = require('../fixtures/signers')
 const subplebbitSigner = signers[0]
-const subplebbitAddress = signers[0].address
 // don't use a plebbit signer instance, use plain text object to test
 const authorSigner = signers[1]
 const pubsubMessageSigner = signers[2]
@@ -32,7 +31,7 @@ describe('protocol (node and browser)', () => {
   describe('create comment and publish over pubsub', () => {
     it('comment', async () => {
       // const comment = await plebbit.createComment({
-      //   subplebbitAddress,
+      //   subplebbitAddress: subplebbitSigner.address,
       //   signer: authorSigner,
       //   content: 'content',
       //   title: 'title'
@@ -47,8 +46,8 @@ describe('protocol (node and browser)', () => {
 
       // create comment
       const comment = {
-        "subplebbitAddress":"QmZVYzLChjKrYDVty6e5JokKffGDZivmEJz9318EYfp2ui",
-        "timestamp":1672198583,
+        "subplebbitAddress": subplebbitSigner.address,
+        "timestamp": Math.round(Date.now() / 1000),
         "protocolVersion":"1.0.0",
         "content":"content",
         "title":"title",
@@ -75,7 +74,7 @@ describe('protocol (node and browser)', () => {
       const encryptedPublication = await encrypt(JSON.stringify(comment), subplebbitSigner.publicKey)
 
       // create pubsub challenge request message
-      const challengeRequestPubsubMessageObject = {
+      const challengeRequestPubsubMessage = {
         type: 'CHALLENGEREQUEST',
         // signature: 'Signature'
         challengeRequestId: getRandomString(),
@@ -88,21 +87,22 @@ describe('protocol (node and browser)', () => {
       // create pubsub challenge request message signature
       const challengeRequestPubsubMessageSignedPropertyNames = shuffleArray(['type','challengeRequestId', 'encryptedPublication', 'acceptedChallengeTypes'])
       const challengeRequestPubsubMessageSignature = await sign({
-        objectToSign: challengeRequestPubsubMessageObject,
+        objectToSign: challengeRequestPubsubMessage,
         // signed prop names can be in any order
         signedPropertyNames: challengeRequestPubsubMessageSignedPropertyNames,
         privateKey: pubsubMessageSigner.privateKey
       })
-      challengeRequestPubsubMessageObject.signature = {
+      challengeRequestPubsubMessage.signature = {
         "signature": challengeRequestPubsubMessageSignature,
         "publicKey": pubsubMessageSigner.publicKey,
         "type": "rsa",
         signedPropertyNames: challengeRequestPubsubMessageSignedPropertyNames
       }
-      console.log({challengeRequestPubsubMessageObject})
+      console.log({challengeRequestPubsubMessage})
 
-      // // publish pubsub challenge request message
-      // const challengePubsubMessage = await publishPubsubMessage(subplebbitAddress, pubsubMessage)
+      // publish pubsub challenge request message
+      const challengePubsubMessage = await publishPubsubMessage(subplebbitSigner.address, challengeRequestPubsubMessage)
+      console.log({challengePubsubMessage})
     })
   })
 })
@@ -119,22 +119,25 @@ const sign = async ({objectToSign, signedPropertyNames, privateKey}) => {
   return signatureBase64
 }
 
-const publishPubsubMessage = async (pubsubTopic, message) => {
+const publishPubsubMessage = async (pubsubTopic, messageObject) => {
   let onMessageReceived
   messageReceivedPromise = new Promise(resolve => {
-    onMessageReceived = (message) => {
-      console.log(`received message from ${message.from}:`, toString(message.data))
-      resolve(message)
+    onMessageReceived = (rawMessageReceived) => {
+      const messageReceivedString = uint8ArrayToString(rawMessageReceived.data)
+      // console.log('message received', messageReceivedString)
+      const messageReceivedObject = JSON.parse(messageReceivedString)
+      if (messageReceivedObject.type === 'CHALLENGE' || messageReceivedObject.type === 'CHALLENGEVERIFICATION') {
+        resolve(messageReceivedObject)
+      }
     }
   })
 
-  console.log('trying to subscribe to:', pubsubTopic)
   await pubsubIpfsClient.pubsub.subscribe(pubsubTopic, onMessageReceived)
   console.log('subscribed to:', pubsubTopic)
 
-  console.log('trying to publish:', message)
-  await pubsubIpfsClient.pubsub.publish(pubsubTopic, Buffer.from(message))
-  console.log('published:', message)
+  const message = uint8ArrayFromString(JSON.stringify(messageObject))
+  await pubsubIpfsClient.pubsub.publish(pubsubTopic, message)
+  console.log('published message')
 
   const messageReceived = await messageReceivedPromise
   return messageReceived
