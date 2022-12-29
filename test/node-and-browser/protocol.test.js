@@ -77,19 +77,17 @@ describe('protocol (node and browser)', () => {
       // create pubsub challenge request message
       const challengeRequestPubsubMessage = {
         type: 'CHALLENGEREQUEST',
-        // signature: 'Signature'
         challengeRequestId: getRandomString(),
         acceptedChallengeTypes: ['image'],
         encryptedPublication: encryptedPublication,
         protocolVersion: '1.0.0',
-        userAgent: `/plebbit-js:1.0.0/`
+        userAgent: `/protocol-test:1.0.0/`
       }
 
       // create pubsub challenge request message signature
       const challengeRequestPubsubMessageSignedPropertyNames = shuffleArray(['type','challengeRequestId', 'encryptedPublication', 'acceptedChallengeTypes'])
       const challengeRequestPubsubMessageSignature = await sign({
         objectToSign: challengeRequestPubsubMessage,
-        // signed prop names can be in any order
         signedPropertyNames: challengeRequestPubsubMessageSignedPropertyNames,
         privateKey: pubsubMessageSigner.privateKey
       })
@@ -133,7 +131,36 @@ describe('protocol (node and browser)', () => {
         publicKey: subplebbitSigner.publicKey
       })).to.equal(true)
 
-      // publish challenge answer
+      // create pubsub challenge answer message
+      const challengeAnswers = ['2']
+      const encryptedChallengeAnswers = await encrypt(JSON.stringify(challengeAnswers), subplebbitSigner.publicKey)
+      const challengeAnswerPubsubMessage = {
+        type: 'CHALLENGEANSWER',
+        challengeAnswerId: getRandomString(),
+        challengeRequestId: challengeRequestPubsubMessage.challengeRequestId,
+        encryptedChallengeAnswers,
+        protocolVersion: '1.0.0',
+        userAgent: `/protocol-test:1.0.0/`
+      }
+
+      // create pubsub challenge answer message signature
+      const challengeAnswerPubsubMessageSignedPropertyNames = shuffleArray(['type','challengeRequestId', 'challengeAnswerId', 'encryptedChallengeAnswers'])
+      const challengeAnswerPubsubMessageSignature = await sign({
+        objectToSign: challengeAnswerPubsubMessage,
+        signedPropertyNames: challengeAnswerPubsubMessageSignedPropertyNames,
+        privateKey: pubsubMessageSigner.privateKey
+      })
+      challengeAnswerPubsubMessage.signature = {
+        "signature": challengeAnswerPubsubMessageSignature,
+        "publicKey": pubsubMessageSigner.publicKey,
+        "type": "rsa",
+        signedPropertyNames: challengeAnswerPubsubMessageSignedPropertyNames
+      }
+      console.log({challengeAnswerPubsubMessage})
+
+      // publish pubsub challenge answer message
+      const challengeVerificationPubsubMessage = await publishPubsubMessage(subplebbitSigner.address, challengeAnswerPubsubMessage)
+      console.log({challengeVerificationPubsubMessage})
     })
   })
 })
@@ -165,11 +192,12 @@ const verify = async ({objectToSign, signedPropertyNames, signature, publicKey})
 const publishPubsubMessage = async (pubsubTopic, messageObject) => {
   let onMessageReceived
   messageReceivedPromise = new Promise(resolve => {
-    onMessageReceived = (rawMessageReceived) => {
+    onMessageReceived = async (rawMessageReceived) => {
       const messageReceivedString = uint8ArrayToString(rawMessageReceived.data)
       // console.log('message received', messageReceivedString)
       const messageReceivedObject = JSON.parse(messageReceivedString)
       if (messageReceivedObject.type === 'CHALLENGE' || messageReceivedObject.type === 'CHALLENGEVERIFICATION') {
+        await pubsubIpfsClient.pubsub.unsubscribe(pubsubTopic) 
         resolve(messageReceivedObject)
       }
     }
