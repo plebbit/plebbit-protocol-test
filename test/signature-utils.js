@@ -1,4 +1,4 @@
-const {getKeyPairFromPrivateKeyPem} = require("./crypto-utils")
+const {getKeyPairFromPrivateKeyPem, getPeerIdFromPublicKeyPem} = require("./crypto-utils")
 
 const isProbablyBuffer = (arg) => arg && typeof arg !== "string" && typeof arg !== "number";
 
@@ -9,4 +9,11 @@ const signBufferRsa = async (bufferToSign, privateKeyPem, privateKeyPemPassword 
   return await keyPair.sign(bufferToSign);
 };
 
-module.exports = {signBufferRsa}
+const verifyBufferRsa = async (bufferToSign, bufferSignature, publicKeyPem) => {
+  if (!isProbablyBuffer(bufferToSign)) throw Error(`verifyBufferRsa invalid bufferSignature '${bufferToSign}' not buffer`);
+  if (!isProbablyBuffer(bufferSignature)) throw Error(`verifyBufferRsa invalid bufferSignature '${bufferSignature}' not buffer`);
+  const peerId = await getPeerIdFromPublicKeyPem(publicKeyPem);
+  return await peerId.pubKey.verify(bufferToSign, bufferSignature);
+};
+
+module.exports = {signBufferRsa, verifyBufferRsa}

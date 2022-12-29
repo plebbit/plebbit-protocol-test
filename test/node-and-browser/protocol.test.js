@@ -1,10 +1,11 @@
 const Plebbit = require('@plebbit/plebbit-js')
+const {expect} = require('chai')
 const cborg = require('cborg')
 const IpfsHttpClient = require('ipfs-http-client')
 const {encrypt, decrypt} = require('../encryption-utils')
 const {fromString: uint8ArrayFromString} = require('uint8arrays/from-string')
 const {toString: uint8ArrayToString} = require('uint8arrays/to-string')
-const {signBufferRsa} = require('../signature-utils')
+const {signBufferRsa, verifyBufferRsa} = require('../signature-utils')
 const {offlineIpfs, pubsubIpfs} = require('../test-server/ipfs-config')
 const plebbitOptions = {
   ipfsHttpClientOptions: `http://localhost:${offlineIpfs.apiPort}/api/v0`,
@@ -103,20 +104,62 @@ describe('protocol (node and browser)', () => {
       // publish pubsub challenge request message
       const challengePubsubMessage = await publishPubsubMessage(subplebbitSigner.address, challengeRequestPubsubMessage)
       console.log({challengePubsubMessage})
+
+      // decrypt challenge
+      const challenge = await decrypt(
+        challengePubsubMessage.encryptedChallenges.encrypted, 
+        challengePubsubMessage.encryptedChallenges.encryptedKey,
+        // TODO: change to pubsubMessageSigner.privateKey when plebbit-js bug is fixed
+        authorSigner.privateKey
+      )
+      console.log({challenge})
+
+      // validate challenge pubsub message
+      expect(challenge).to.equal('[{"challenge":"1+1=?","type":"text"}]')
+      expect(challengePubsubMessage.type).to.equal('CHALLENGE')
+      expect(challengePubsubMessage.encryptedChallenges.type).to.equal('aes-cbc')
+      expect(challengePubsubMessage.challengeRequestId).to.equal(challengeRequestPubsubMessage.challengeRequestId)
+
+      // validate challenge pubsub message subplebbit owner signature
+      expect(challengePubsubMessage.signature.type).to.equal('rsa')
+      expect(challengePubsubMessage.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+      expect(challengePubsubMessage.signature.signedPropertyNames.includes('type')).to.equal(true)
+      expect(challengePubsubMessage.signature.signedPropertyNames.includes('challengeRequestId')).to.equal(true)
+      expect(challengePubsubMessage.signature.signedPropertyNames.includes('encryptedChallenges')).to.equal(true)
+      expect(await verify({
+        objectToSign: challengePubsubMessage, 
+        signedPropertyNames: challengePubsubMessage.signature.signedPropertyNames, 
+        signature: challengePubsubMessage.signature.signature, 
+        publicKey: subplebbitSigner.publicKey
+      })).to.equal(true)
+
+      // publish challenge answer
     })
   })
 })
 
-const sign = async ({objectToSign, signedPropertyNames, privateKey}) => {
+const getBufferToSign = (objectToSign, signedPropertyNames) => {
   const propsToSign = {}
   for (const propertyName of signedPropertyNames) {
     propsToSign[propertyName] = objectToSign[propertyName]
   }
   // console.log({propsToSign})
   const bufferToSign = cborg.encode(propsToSign)
+  return bufferToSign
+}
+
+const sign = async ({objectToSign, signedPropertyNames, privateKey}) => {
+  const bufferToSign = getBufferToSign(objectToSign, signedPropertyNames)
   const signatureBuffer = await signBufferRsa(bufferToSign, privateKey)
   const signatureBase64 = uint8ArrayToString(signatureBuffer, 'base64')
   return signatureBase64
+}
+
+const verify = async ({objectToSign, signedPropertyNames, signature, publicKey}) => {
+  const bufferToSign = getBufferToSign(objectToSign, signedPropertyNames)
+  const signatureAsBuffer = uint8ArrayFromString(signature, 'base64')
+  const res = await verifyBufferRsa(bufferToSign, signatureAsBuffer, publicKey)
+  return res
 }
 
 const publishPubsubMessage = async (pubsubTopic, messageObject) => {
@@ -137,7 +180,7 @@ const publishPubsubMessage = async (pubsubTopic, messageObject) => {
 
   const message = uint8ArrayFromString(JSON.stringify(messageObject))
   await pubsubIpfsClient.pubsub.publish(pubsubTopic, message)
-  console.log('published message')
+  console.log('published message:', messageObject.type)
 
   const messageReceived = await messageReceivedPromise
   return messageReceived
