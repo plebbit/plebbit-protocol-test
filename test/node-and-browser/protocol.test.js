@@ -5,10 +5,10 @@ chai.use(require('chai-string'))
 const Plebbit = require('@plebbit/plebbit-js')
 const cborg = require('cborg')
 const IpfsHttpClient = require('ipfs-http-client')
-const {encrypt, decrypt} = require('../encryption-utils')
+const {encrypt, decrypt} = require('../utils/encryption')
 const {fromString: uint8ArrayFromString} = require('uint8arrays/from-string')
 const {toString: uint8ArrayToString} = require('uint8arrays/to-string')
-const {signBufferRsa, verifyBufferRsa} = require('../signature-utils')
+const {signBufferRsa, verifyBufferRsa} = require('../utils/signature')
 const {offlineIpfs, pubsubIpfs} = require('../test-server/ipfs-config')
 const plebbitOptions = {
   ipfsHttpClientOptions: `http://localhost:${offlineIpfs.apiPort}/api/v0`,
