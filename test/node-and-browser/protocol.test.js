@@ -3,6 +3,7 @@ const {expect} = chai
 chai.use(require('chai-string'))
 
 const Plebbit = require('@plebbit/plebbit-js')
+const fetch = require('node-fetch')
 const cborg = require('cborg')
 const IpfsHttpClient = require('ipfs-http-client')
 const {encrypt, decrypt} = require('../utils/encryption')
@@ -14,7 +15,8 @@ const plebbitOptions = {
   ipfsHttpClientOptions: `http://localhost:${offlineIpfs.apiPort}/api/v0`,
   pubsubHttpClientOptions: `http://localhost:${pubsubIpfs.apiPort}/api/v0`,
 }
-console.log(plebbitOptions)
+const ipfsGatewayUrl = `http://localhost:${offlineIpfs.gatewayPort}`
+console.log({plebbitOptions, ipfsGatewayUrl})
 const pubsubIpfsClient = IpfsHttpClient.create({url: plebbitOptions.pubsubHttpClientOptions})
 const signers = require('../fixtures/signers')
 const subplebbitSigner = signers[0]
@@ -155,7 +157,7 @@ describe('protocol (node and browser)', () => {
       console.log({challengeVerificationPubsubMessage})
 
       // decrypt challenge verification publication
-      const publication = JSON.parse(
+      const publishedPublication = JSON.parse(
         await decrypt(
           challengeVerificationPubsubMessage.encryptedPublication.encrypted,
           challengeVerificationPubsubMessage.encryptedPublication.encryptedKey,
@@ -163,18 +165,19 @@ describe('protocol (node and browser)', () => {
           authorSigner.privateKey
         )
       )
-      console.log({publication})
+      console.log({publishedPublication})
 
       // validate challenge verification pubsub message
-      expect(publication.author.address).to.equal(comment.author.address)
-      expect(publication.content).to.equal(comment.content)
-      expect(publication.title).to.equal(comment.title)
-      expect(publication.timestamp).to.equal(comment.timestamp)
-      expect(publication.depth).to.equal(0)
-      expect(publication.subplebbitAddress).to.equal(comment.subplebbitAddress)
-      expect(publication.cid).to.startWith('Qm')
+      expect(publishedPublication.author.address).to.equal(comment.author.address)
+      expect(publishedPublication.content).to.equal(comment.content)
+      expect(publishedPublication.title).to.equal(comment.title)
+      expect(publishedPublication.timestamp).to.equal(comment.timestamp)
+      expect(publishedPublication.depth).to.equal(0)
+      expect(publishedPublication.subplebbitAddress).to.equal(comment.subplebbitAddress)
+      expect(publishedPublication.signature).to.deep.equal(comment.signature)
+      expect(publishedPublication.cid).to.startWith('Qm')
       // TODO: uncomment when plebbit-js bug is fixed
-      // expect(publication.ipnsName).to.startWith('Qm')
+      // expect(publishedPublication.ipnsName).to.startWith('Qm')
       expect(challengeVerificationPubsubMessage.type).to.equal('CHALLENGEVERIFICATION')
       expect(challengeVerificationPubsubMessage.encryptedPublication.type).to.equal('aes-cbc')
       expect(challengeVerificationPubsubMessage.challengeSuccess).to.equal(true)
@@ -201,10 +204,22 @@ describe('protocol (node and browser)', () => {
       ).to.equal(true)
 
       // fetch published comment with ipfs
+      console.log(`${ipfsGatewayUrl}/ipfs/${publishedPublication.cid}`)
+      const commentIpfs = await fetchJson(`${ipfsGatewayUrl}/ipfs/${publishedPublication.cid}`)
+      console.log({commentIpfs})
 
-      // verify comment ipfs
+      // validate comment ipfs
+      expect(commentIpfs.author.address).to.equal(publishedPublication.author.address)
+      expect(commentIpfs.content).to.equal(publishedPublication.content)
+      expect(commentIpfs.title).to.equal(publishedPublication.title)
+      expect(commentIpfs.timestamp).to.equal(publishedPublication.timestamp)
+      expect(commentIpfs.depth).to.equal(publishedPublication.depth)
+      expect(commentIpfs.subplebbitAddress).to.equal(publishedPublication.subplebbitAddress)
+      expect(commentIpfs.signature).to.deep.equal(publishedPublication.signature)
+      expect(commentIpfs.cid).to.equal(undefined)
+      expect(commentIpfs.ipnsName).to.equal(publishedPublication.ipnsName)
 
-      // verify comment ipns
+      // validate comment ipns
 
       // fetch subplebbit ipns
 
@@ -221,6 +236,8 @@ describe('protocol (node and browser)', () => {
   // describe('create mod comment edit and publish over pubsub', () => {})
 
   // describe('subplebbit edit and publish over pubsub', () => {})
+
+  // describe('validate CHALLENGEREQUEST and CHALLENGEANSWER pubsub messages', () => {})
 })
 
 const getBufferToSign = (objectToSign, signedPropertyNames) => {
@@ -284,3 +301,5 @@ function shuffleArray(array) {
   }
   return array
 }
+
+const fetchJson = (url) => fetch(url, {redirect: 'manual'}).then((res) => res.json())
