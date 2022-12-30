@@ -113,9 +113,7 @@ describe('protocol (node and browser)', () => {
       // validate challenge pubsub message subplebbit owner signature
       expect(challengePubsubMessage.signature.type).to.equal('rsa')
       expect(challengePubsubMessage.signature.publicKey).to.equal(subplebbitSigner.publicKey)
-      expect(challengePubsubMessage.signature.signedPropertyNames.includes('type')).to.equal(true)
-      expect(challengePubsubMessage.signature.signedPropertyNames.includes('challengeRequestId')).to.equal(true)
-      expect(challengePubsubMessage.signature.signedPropertyNames.includes('encryptedChallenges')).to.equal(true)
+      expect(challengePubsubMessage.signature.signedPropertyNames).to.include.members(['type', 'challengeRequestId', 'encryptedChallenges'])
       expect(
         await verify({
           objectToSign: challengePubsubMessage,
@@ -187,13 +185,15 @@ describe('protocol (node and browser)', () => {
       // validate challenge verification pubsub message subplebbit owner signature
       expect(challengeVerificationPubsubMessage.signature.type).to.equal('rsa')
       expect(challengeVerificationPubsubMessage.signature.publicKey).to.equal(subplebbitSigner.publicKey)
-      expect(challengeVerificationPubsubMessage.signature.signedPropertyNames.includes('type')).to.equal(true)
-      expect(challengeVerificationPubsubMessage.signature.signedPropertyNames.includes('challengeRequestId')).to.equal(true)
-      expect(challengeVerificationPubsubMessage.signature.signedPropertyNames.includes('challengeAnswerId')).to.equal(true)
-      expect(challengeVerificationPubsubMessage.signature.signedPropertyNames.includes('challengeSuccess')).to.equal(true)
-      expect(challengeVerificationPubsubMessage.signature.signedPropertyNames.includes('encryptedPublication')).to.equal(true)
-      expect(challengeVerificationPubsubMessage.signature.signedPropertyNames.includes('challengeErrors')).to.equal(true)
-      expect(challengeVerificationPubsubMessage.signature.signedPropertyNames.includes('reason')).to.equal(true)
+      expect(challengeVerificationPubsubMessage.signature.signedPropertyNames).to.include.members([
+        'type',
+        'challengeRequestId',
+        'challengeAnswerId',
+        'challengeSuccess',
+        'encryptedPublication',
+        'challengeErrors',
+        'reason',
+      ])
       expect(
         await verify({
           objectToSign: challengeVerificationPubsubMessage,
@@ -204,7 +204,6 @@ describe('protocol (node and browser)', () => {
       ).to.equal(true)
 
       // fetch published comment with ipfs
-      console.log(`${ipfsGatewayUrl}/ipfs/${publishedPublication.cid}`)
       const commentIpfs = await fetchJson(`${ipfsGatewayUrl}/ipfs/${publishedPublication.cid}`)
       console.log({commentIpfs})
 
@@ -219,7 +218,42 @@ describe('protocol (node and browser)', () => {
       expect(commentIpfs.cid).to.equal(undefined)
       expect(commentIpfs.ipnsName).to.equal(publishedPublication.ipnsName)
 
+      // fetch comment ipns
+      const commentIpns = await fetchJson(`${ipfsGatewayUrl}/ipns/${commentIpfs.ipnsName}`)
+      console.log({commentIpns})
+
       // validate comment ipns
+      expect(commentIpns.upvoteCount).to.equal(0)
+      expect(commentIpns.downvoteCount).to.equal(0)
+      expect(commentIpns.replyCount).to.equal(0)
+      expect(typeof commentIpns.updatedAt).to.equal('number')
+
+      // validate comment ipns signature
+      expect(commentIpns.signature.type).to.equal('rsa')
+      expect(commentIpns.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+      expect(commentIpns.signature.signedPropertyNames).to.include.members([
+        'authorEdit',
+        'upvoteCount',
+        'downvoteCount',
+        'replies',
+        'replyCount',
+        'flair',
+        'spoiler',
+        'pinned',
+        'locked',
+        'removed',
+        'moderatorReason',
+        'updatedAt',
+        'author',
+      ])
+      expect(
+        await verify({
+          objectToSign: commentIpns,
+          signedPropertyNames: commentIpns.signature.signedPropertyNames,
+          signature: commentIpns.signature.signature,
+          publicKey: subplebbitSigner.publicKey,
+        })
+      ).to.equal(true)
 
       // fetch subplebbit ipns
 
@@ -302,4 +336,24 @@ function shuffleArray(array) {
   return array
 }
 
-const fetchJson = (url) => fetch(url, {redirect: 'manual'}).then((res) => res.json())
+const fetchJson = async (url) => {
+  const _fetchJson = () =>
+    fetch(url, {
+      // ipfs tries to redirect to <cid>.localhost
+      redirect: 'manual',
+    }).then((res) => res.json())
+
+  // retry because ipns takes some time to load
+  let maxRetries = 5
+  while (true) {
+    try {
+      const res = await _fetchJson(url)
+      return res
+    } catch (e) {
+      if (maxRetries-- === 0) {
+        throw e
+      }
+      await new Promise((r) => setTimeout(r, 1000)) // sleep
+    }
+  }
+}
