@@ -256,12 +256,52 @@ describe('protocol (node and browser)', () => {
       ).to.equal(true)
 
       // fetch subplebbit ipns
+      const subplebbitIpns = await fetchJson(`${ipfsGatewayUrl}/ipns/${subplebbitSigner.address}`)
+      console.log({subplebbitIpns})
+
+      // validate subplebbit ipns
+      expect(subplebbitIpns.address).to.equal(subplebbitSigner.address)
+      expect(typeof subplebbitIpns.updatedAt).to.equal('number')
+
+      // validate subplebbit ipns signature
+      expect(subplebbitIpns.signature.type).to.equal('rsa')
+      expect(subplebbitIpns.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+      expect(subplebbitIpns.signature.signedPropertyNames).to.include.members([
+        'address',
+        'title',
+        'description',
+        'roles',
+        'pubsubTopic',
+        'lastPostCid',
+        'posts',
+        'challengeTypes',
+        'metricsCid',
+        'createdAt',
+        'updatedAt',
+        'features',
+        'suggested',
+        'rules',
+        'flairs',
+        'encryption',
+      ])
+      expect(
+        await verify({
+          objectToSign: subplebbitIpns,
+          signedPropertyNames: subplebbitIpns.signature.signedPropertyNames,
+          signature: subplebbitIpns.signature.signature,
+          publicKey: subplebbitSigner.publicKey,
+        })
+      ).to.equal(true)
 
       // fetch subplebbit page
+
+      // validate subplebbit page
     })
   })
 
   // TODO:
+
+  // describe('validate CHALLENGEREQUEST and CHALLENGEANSWER pubsub messages', () => {})
 
   // describe('create vote and publish over pubsub', () => {})
 
@@ -270,8 +310,6 @@ describe('protocol (node and browser)', () => {
   // describe('create mod comment edit and publish over pubsub', () => {})
 
   // describe('subplebbit edit and publish over pubsub', () => {})
-
-  // describe('validate CHALLENGEREQUEST and CHALLENGEANSWER pubsub messages', () => {})
 })
 
 const getBufferToSign = (objectToSign, signedPropertyNames) => {
