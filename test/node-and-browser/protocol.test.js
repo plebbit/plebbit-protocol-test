@@ -370,20 +370,77 @@ describe('protocol (node and browser)', () => {
 
     // listen for comment over p2p
     const signer = await plebbit.createSigner({privateKey: authorSigner.privateKey, type: 'rsa'})
-    const comment = await plebbit.createComment({
+    const createCommentOptions = {
       subplebbitAddress: subplebbitSigner.address,
       signer,
       title: 'title',
       content: 'content',
-    })
+    }
+    const comment = await plebbit.createComment({...createCommentOptions})
     const pubsub = await pubsubSubscribe(subplebbitSigner.address)
     comment.publish().catch(console.log)
     const challengeRequestPubsubMessage = await pubsub.getMessage()
+
+    // decrypt publication
+    challengeRequestPubsubMessage.publication = JSON.parse(
+      await decrypt(
+        challengeRequestPubsubMessage.encryptedPublication.encrypted,
+        challengeRequestPubsubMessage.encryptedPublication.encryptedKey,
+        subplebbitSigner.privateKey
+      )
+    )
     console.log({challengeRequestPubsubMessage})
 
     // validate challenge request pubsub message
+    expect(challengeRequestPubsubMessage.type).to.equal('CHALLENGEREQUEST')
+    expect(challengeRequestPubsubMessage.encryptedPublication.type).to.equal('aes-cbc')
+    expect(typeof challengeRequestPubsubMessage.challengeRequestId).to.equal('string')
 
-    // validate comment
+    // validate challenge request pubsub message signature
+    expect(challengeRequestPubsubMessage.signature.type).to.equal('rsa')
+    // TODO: pubsub message signer should not be the publication signer or loss of anonymity
+    // expect(challengeRequestPubsubMessage.signature.publicKey).to.not.equal(authorSigner.publicKey)
+    expect(challengeRequestPubsubMessage.signature.signedPropertyNames).to.include.members([
+      'type',
+      'challengeRequestId',
+      'encryptedPublication',
+      'acceptedChallengeTypes',
+    ])
+    expect(
+      await verify({
+        objectToSign: challengeRequestPubsubMessage,
+        signedPropertyNames: challengeRequestPubsubMessage.signature.signedPropertyNames,
+        signature: challengeRequestPubsubMessage.signature.signature,
+        // use a random new public key, which must be the same with all future same challengeRequestId
+        publicKey: challengeRequestPubsubMessage.signature.publicKey,
+      })
+    ).to.equal(true)
+
+    // validate publication and publication signature
+    expect(challengeRequestPubsubMessage.publication.author.address).to.equal(authorSigner.address)
+    expect(challengeRequestPubsubMessage.publication.content).to.equal(createCommentOptions.content)
+    expect(challengeRequestPubsubMessage.publication.title).to.equal(createCommentOptions.title)
+    expect(challengeRequestPubsubMessage.publication.timestamp).to.equal(comment.timestamp)
+    expect(typeof challengeRequestPubsubMessage.publication.timestamp).to.equal('number')
+    expect(challengeRequestPubsubMessage.publication.subplebbitAddress).to.equal(createCommentOptions.subplebbitAddress)
+    console.log(challengeRequestPubsubMessage.publication.signature.signedPropertyNames)
+    expect(challengeRequestPubsubMessage.publication.signature.signedPropertyNames).to.include.members([
+      // NOTE: flair and spoiler and not included in author signature because subplebbit mods can override it
+      'author',
+      'subplebbitAddress',
+      'timestamp',
+      'parentCid',
+      'content',
+      'link',
+    ])
+    expect(
+      await verify({
+        objectToSign: challengeRequestPubsubMessage.publication,
+        signedPropertyNames: challengeRequestPubsubMessage.publication.signature.signedPropertyNames,
+        signature: challengeRequestPubsubMessage.publication.signature.signature,
+        publicKey: authorSigner.publicKey,
+      })
+    ).to.equal(true)
 
     // publish challenge
 
