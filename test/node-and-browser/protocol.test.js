@@ -474,9 +474,42 @@ describe('protocol (node and browser)', () => {
 
     // publish challenge pusub message
     const challengeAnswerPubsubMessage = await publishPubsubMessage(subplebbitSigner.address, challengePubsubMessage)
+
+    // decrypt challenge answers
+    challengeAnswerPubsubMessage.challengeAnswers = JSON.parse(
+      await decrypt(
+        challengeAnswerPubsubMessage.encryptedChallengeAnswers.encrypted,
+        challengeAnswerPubsubMessage.encryptedChallengeAnswers.encryptedKey,
+        subplebbitSigner.privateKey
+      )
+    )
     console.log({challengeAnswerPubsubMessage})
 
-    // validate challenge answer
+    // validate challenge answer pubsub message
+    expect(challengeAnswerPubsubMessage.type).to.equal('CHALLENGEANSWER')
+    expect(challengeAnswerPubsubMessage.encryptedChallengeAnswers.type).to.equal('aes-cbc')
+    expect(challengeAnswerPubsubMessage.challengeRequestId).to.equal(challengeRequestPubsubMessage.challengeRequestId)
+    expect(typeof challengeAnswerPubsubMessage.challengeAnswerId).to.equal('string')
+    expect(challengeAnswerPubsubMessage.challengeAnswers).to.deep.equal(['2'])
+
+    // validate challenge answer pubsub message signature
+    expect(challengeAnswerPubsubMessage.signature.type).to.equal('rsa')
+    // the pubsub message signer is the same as the original challenge request id
+    expect(challengeAnswerPubsubMessage.signature.publicKey).to.equal(challengeRequestPubsubMessage.signature.publicKey)
+    expect(challengeAnswerPubsubMessage.signature.signedPropertyNames).to.include.members([
+      'type',
+      'challengeRequestId',
+      'challengeAnswerId',
+      'encryptedChallengeAnswers',
+    ])
+    expect(
+      await verify({
+        objectToSign: challengeAnswerPubsubMessage,
+        signedPropertyNames: challengeAnswerPubsubMessage.signature.signedPropertyNames,
+        signature: challengeAnswerPubsubMessage.signature.signature,
+        publicKey: challengeAnswerPubsubMessage.signature.publicKey,
+      })
+    ).to.equal(true)
 
     await pubsub.unsubscribe()
   })
