@@ -103,4 +103,4 @@ const validatePublicKeyPem = (publicKeyPem) => {
   if (!publicKeyPem.startsWith('-----BEGIN PUBLIC KEY-----')) throw Error(`invalid public key pem '${publicKeyPem}' not public key pem`)
 }
 
-module.exports = {getKeyPairFromPrivateKeyPem, getPeerIdFromPublicKeyPem}
+module.exports = {getKeyPairFromPrivateKeyPem, getPeerIdFromPublicKeyPem, getIpfsKeyFromPrivateKeyPem}
