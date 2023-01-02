@@ -362,8 +362,8 @@ describe('protocol (node and browser)', () => {
     } catch (e) {
       console.log(e.message)
     }
-    const file = await ipfsClient.add(JSON.stringify(subplebbitIpns))
-    await ipfsClient.name.publish(file.path, {
+    const subplebbitIpnsFile = await ipfsClient.add(JSON.stringify(subplebbitIpns))
+    await ipfsClient.name.publish(subplebbitIpnsFile.path, {
       lifetime: '72h',
       key: subplebbitSigner.address, // ipfs key name
       allowOffline: true,
@@ -380,8 +380,14 @@ describe('protocol (node and browser)', () => {
     const comment = await plebbit.createComment({...createCommentOptions})
     const pubsub = await pubsubSubscribe(subplebbitSigner.address)
     comment.on('challenge', (challenge) => {
-      console.log({challenge})
+      console.log('challenge event')
       comment.publishChallengeAnswers(['2']).catch(console.error)
+    })
+    const challengeVerificationPromise = new Promise((resolve) => {
+      comment.on('challengeverification', (challengeVerification) => {
+        console.log('challengeverification event')
+        resolve(challengeVerification)
+      })
     })
     comment.publish().catch(console.error)
     const challengeRequestPubsubMessage = await pubsub.getMessage()
@@ -448,7 +454,7 @@ describe('protocol (node and browser)', () => {
 
     // create challenge pusub message
     const challenges = [{challenge: '1+1=?', type: 'text'}]
-    const encryptedChallenges = await encrypt(JSON.stringify(challenges), authorSigner.publicKey)
+    const encryptedChallenges = await encrypt(JSON.stringify(challenges), challengeRequestPubsubMessage.signature.publicKey)
     const challengePubsubMessage = {
       type: 'CHALLENGE',
       challengeRequestId: challengeRequestPubsubMessage.challengeRequestId,
@@ -472,7 +478,7 @@ describe('protocol (node and browser)', () => {
     }
     console.log({challengePubsubMessage})
 
-    // publish challenge pusub message
+    // publish challenge pubsub message
     const challengeAnswerPubsubMessage = await publishPubsubMessage(subplebbitSigner.address, challengePubsubMessage)
 
     // decrypt challenge answers
@@ -510,6 +516,63 @@ describe('protocol (node and browser)', () => {
         publicKey: challengeAnswerPubsubMessage.signature.publicKey,
       })
     ).to.equal(true)
+
+    // create encrypted publication
+    const publicationIpfs = {
+      ...challengeRequestPubsubMessage.publication,
+      depth: 0,
+      ipnsName: 'ipns name',
+    }
+    const publicationIpfsFile = await ipfsClient.add(JSON.stringify(subplebbitIpns))
+    const publishedPublication = {
+      ...publicationIpfs,
+      cid: publicationIpfsFile.path,
+    }
+    console.log({publishedPublication})
+    const encryptedPublishedPublication = await encrypt(JSON.stringify(publishedPublication), challengeRequestPubsubMessage.signature.publicKey)
+
+    // create challenge verification pubsub message
+    const challengeVerificationPubsubMessage = {
+      type: 'CHALLENGEVERIFICATION',
+      challengeRequestId: challengeAnswerPubsubMessage.challengeRequestId,
+      challengeAnswerId: challengeAnswerPubsubMessage.challengeAnswerId,
+      challengeSuccess: true,
+      encryptedPublication: encryptedPublishedPublication,
+      protocolVersion: '1.0.0',
+      userAgent: `/protocol-test:1.0.0/`,
+    }
+    const challengeVerificationPubsubMessageSignedPropertyNames = shuffleArray([
+      'type',
+      'challengeRequestId',
+      'challengeAnswerId',
+      'challengeSuccess',
+      'encryptedPublication',
+      'challengeErrors',
+      'reason',
+    ])
+    const challengeVerificationPubsubMessageSignature = await sign({
+      objectToSign: challengeVerificationPubsubMessage,
+      signedPropertyNames: challengeVerificationPubsubMessageSignedPropertyNames,
+      privateKey: subplebbitSigner.privateKey,
+    })
+    challengeVerificationPubsubMessage.signature = {
+      signature: challengeVerificationPubsubMessageSignature,
+      publicKey: subplebbitSigner.publicKey,
+      type: 'rsa',
+      signedPropertyNames: challengeVerificationPubsubMessageSignedPropertyNames,
+    }
+    console.log({challengeVerificationPubsubMessage})
+
+    // publish challenge verification pubsub message
+    await publishPubsubMessage(subplebbitSigner.address, challengeVerificationPubsubMessage)
+    const challengeVerificationEvent = await challengeVerificationPromise
+    console.log({challengeVerificationEvent})
+
+    // validate challenge verification event
+    expect(challengeVerificationEvent.challengeSuccess).to.equal(true)
+    expect(challengeVerificationEvent.publication).to.deep.equal(publishedPublication)
+
+    // validate comment update
 
     await pubsub.unsubscribe()
   })
@@ -581,6 +644,11 @@ const publishPubsubMessage = async (pubsubTopic, messageObject) => {
   const message = uint8ArrayFromString(JSON.stringify(messageObject))
   await pubsubIpfsClient.pubsub.publish(pubsubTopic, message)
   console.log('published message:', messageObject.type)
+
+  // handle publishing CHALLENGEVERIFICATION
+  if (messageObject.type === 'CHALLENGEVERIFICATION') {
+    return
+  }
 
   const messageReceived = await messageReceivedPromise
   return messageReceived
