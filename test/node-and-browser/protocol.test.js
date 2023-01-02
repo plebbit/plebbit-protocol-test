@@ -30,6 +30,7 @@ let plebbit
 describe('protocol (node and browser)', () => {
   before(async () => {
     plebbit = await Plebbit(plebbitOptions)
+    plebbit.on('error', console.error)
   })
   after(async () => {})
 
@@ -378,7 +379,11 @@ describe('protocol (node and browser)', () => {
     }
     const comment = await plebbit.createComment({...createCommentOptions})
     const pubsub = await pubsubSubscribe(subplebbitSigner.address)
-    comment.publish().catch(console.log)
+    comment.on('challenge', (challenge) => {
+      console.log({challenge})
+      comment.publishChallengeAnswers(['2']).catch(console.error)
+    })
+    comment.publish().catch(console.error)
     const challengeRequestPubsubMessage = await pubsub.getMessage()
 
     // decrypt publication
@@ -423,7 +428,6 @@ describe('protocol (node and browser)', () => {
     expect(challengeRequestPubsubMessage.publication.timestamp).to.equal(comment.timestamp)
     expect(typeof challengeRequestPubsubMessage.publication.timestamp).to.equal('number')
     expect(challengeRequestPubsubMessage.publication.subplebbitAddress).to.equal(createCommentOptions.subplebbitAddress)
-    console.log(challengeRequestPubsubMessage.publication.signature.signedPropertyNames)
     expect(challengeRequestPubsubMessage.publication.signature.signedPropertyNames).to.include.members([
       // NOTE: flair and spoiler and not included in author signature because subplebbit mods can override it
       'author',
@@ -442,7 +446,35 @@ describe('protocol (node and browser)', () => {
       })
     ).to.equal(true)
 
-    // publish challenge
+    // create challenge pusub message
+    const challenges = [{challenge: '1+1=?', type: 'text'}]
+    const encryptedChallenges = await encrypt(JSON.stringify(challenges), authorSigner.publicKey)
+    const challengePubsubMessage = {
+      type: 'CHALLENGE',
+      challengeRequestId: challengeRequestPubsubMessage.challengeRequestId,
+      encryptedChallenges,
+      protocolVersion: '1.0.0',
+      userAgent: `/protocol-test:1.0.0/`,
+    }
+
+    // create pubsub challenge message signature
+    const challengePubsubMessageSignedPropertyNames = shuffleArray(['type', 'challengeRequestId', 'encryptedChallenges'])
+    const challengePubsubMessageSignature = await sign({
+      objectToSign: challengePubsubMessage,
+      signedPropertyNames: challengePubsubMessageSignedPropertyNames,
+      privateKey: subplebbitSigner.privateKey,
+    })
+    challengePubsubMessage.signature = {
+      signature: challengePubsubMessageSignature,
+      publicKey: subplebbitSigner.publicKey,
+      type: 'rsa',
+      signedPropertyNames: challengePubsubMessageSignedPropertyNames,
+    }
+    console.log({challengePubsubMessage})
+
+    // publish challenge pusub message
+    const challengeAnswerPubsubMessage = await publishPubsubMessage(subplebbitSigner.address, challengePubsubMessage)
+    console.log({challengeAnswerPubsubMessage})
 
     // validate challenge answer
 
@@ -491,9 +523,21 @@ const publishPubsubMessage = async (pubsubTopic, messageObject) => {
       const messageReceivedString = uint8ArrayToString(rawMessageReceived.data)
       // console.log('message received', messageReceivedString)
       const messageReceivedObject = JSON.parse(messageReceivedString)
-      if (messageReceivedObject.type === 'CHALLENGE' || messageReceivedObject.type === 'CHALLENGEVERIFICATION') {
-        await pubsubIpfsClient.pubsub.unsubscribe(pubsubTopic)
-        resolve(messageReceivedObject)
+
+      // handle publishing CHALLENGEREQUEST and CHALLENGEANSWER
+      if (messageObject.type === 'CHALLENGEREQUEST' || messageObject.type === 'CHALLENGEANSWER') {
+        if (messageReceivedObject.type === 'CHALLENGE' || messageReceivedObject.type === 'CHALLENGEVERIFICATION') {
+          console.log('unsubscribed from:', pubsubTopic)
+          await pubsubIpfsClient.pubsub.unsubscribe(pubsubTopic)
+          resolve(messageReceivedObject)
+        }
+      }
+
+      // handle publishing CHALLENGE
+      if (messageObject.type === 'CHALLENGE') {
+        if (messageReceivedObject.type === 'CHALLENGEANSWER') {
+          resolve(messageReceivedObject)
+        }
       }
     }
   })
@@ -513,8 +557,11 @@ const pubsubSubscribe = async (pubsubTopic) => {
   let getMessageResolve = () => {}
 
   const onMessageReceived = async (rawMessageReceived) => {
+    await sleep(100) // need to sleep or doesn't work for some reason
+
     const messageReceivedString = uint8ArrayToString(rawMessageReceived.data)
-    console.log('message received', messageReceivedString)
+    // console.log('message received', messageReceivedString)
+
     const messageReceivedObject = JSON.parse(messageReceivedString)
     if (messageReceivedObject.type === 'CHALLENGEREQUEST' || messageReceivedObject.type === 'CHALLENGEANSWER') {
       getMessageResolve(messageReceivedObject)
@@ -574,3 +621,5 @@ const fetchJson = async (url) => {
     }
   }
 }
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
