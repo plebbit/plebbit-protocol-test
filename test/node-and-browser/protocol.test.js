@@ -958,8 +958,8 @@ describe('protocol (node and browser)', () => {
     // fetch comment ipns
     const commentIpfs = await fetchJson(`${ipfsGatewayUrl}/ipfs/${publishedCommentCid}`)
     let commentIpns
-    // wait until author edit is published
-    while (!commentIpns?.authorEdit) {
+    // wait until latest author edit is published (multiple tests use the same comment)
+    while (!commentIpns?.authorEdit || commentIpns.authorEdit.timestamp !== commentEdit.timestamp) {
       commentIpns = await fetchJson(`${ipfsGatewayUrl}/ipns/${commentIpfs.ipnsName}`)
     }
     console.log({commentIpns})
@@ -1035,6 +1035,11 @@ const publishPubsubMessage = async (pubsubTopic, messageObject) => {
       const messageReceivedString = uint8ArrayToString(rawMessageReceived.data)
       // console.log('message received', messageReceivedString)
       const messageReceivedObject = JSON.parse(messageReceivedString)
+
+      // not the message we're looking for
+      if (messageObject.challengeRequestId !== messageReceivedObject.challengeRequestId) {
+        return
+      }
 
       // handle publishing CHALLENGEREQUEST and CHALLENGEANSWER
       if (messageObject.type === 'CHALLENGEREQUEST' || messageObject.type === 'CHALLENGEANSWER') {
