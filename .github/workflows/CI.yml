@@ -8,7 +8,7 @@ on:
     paths:
       - 'test/**'
       - 'config/**'
-      # - '.github/**'
+      - '.github/**'
       - 'package.json'
       - 'yarn.lock'
   push:
