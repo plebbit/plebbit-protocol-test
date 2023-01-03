@@ -7,7 +7,6 @@ const fetch = require('node-fetch')
 const cborg = require('cborg')
 const IpfsHttpClient = require('ipfs-http-client')
 const {encrypt, decrypt} = require('../utils/encryption')
-const {ipfsKeyImport} = require('../utils/ipfs')
 const {fromString: uint8ArrayFromString} = require('uint8arrays/from-string')
 const {toString: uint8ArrayToString} = require('uint8arrays/to-string')
 const {signBufferRsa, verifyBufferRsa} = require('../utils/signature')
@@ -303,27 +302,6 @@ describe('protocol (node and browser)', () => {
     const authorSigner = signers[0]
     const commentIpnsSigner = signers[2]
 
-    // import subplebbit and comment ipns keys into ipfs node using key name = signer.address
-    // ignore failure if key is already imported
-    try {
-      await ipfsKeyImport({
-        keyName: subplebbitSigner.address,
-        privateKey: subplebbitSigner.privateKey,
-        ipfsHttpUrl: plebbitOptions.ipfsHttpClientOptions,
-      })
-    } catch (e) {
-      console.log(e.message)
-    }
-    try {
-      await ipfsKeyImport({
-        keyName: commentIpnsSigner.address,
-        privateKey: commentIpnsSigner.privateKey,
-        ipfsHttpUrl: plebbitOptions.ipfsHttpClientOptions,
-      })
-    } catch (e) {
-      console.log(e.message)
-    }
-
     // create subplebbit ipns object
     const subplebbitIpns = {
       address: subplebbitSigner.address,
@@ -379,7 +357,7 @@ describe('protocol (node and browser)', () => {
     const subplebbitIpnsFile = await ipfsClient.add(JSON.stringify(subplebbitIpns))
     await ipfsClient.name.publish(subplebbitIpnsFile.path, {
       lifetime: '72h',
-      key: subplebbitSigner.address, // ipfs key name
+      key: subplebbitSigner.address, // ipfs key name imported in test server
       allowOffline: true,
     })
 
@@ -628,7 +606,7 @@ describe('protocol (node and browser)', () => {
     const commentIpnsFile = await ipfsClient.add(JSON.stringify(commentIpns))
     await ipfsClient.name.publish(commentIpnsFile.path, {
       lifetime: '72h',
-      key: commentIpnsSigner.address, // ipfs key name
+      key: commentIpnsSigner.address, // ipfs key name imported in test server
       allowOffline: true,
     })
 
@@ -1144,7 +1122,16 @@ const fetchJson = async (url) => {
     fetch(url, {
       // ipfs tries to redirect to <cid>.localhost
       redirect: 'manual',
-    }).then((res) => res.json())
+    }).then(async (res) => {
+      const text = await res.text()
+      try {
+        const json = JSON.parse(text)
+        return json
+      } catch (e) {
+        e.message += `: fetch response status '${res.status}' body '${text}'`
+        throw e
+      }
+    })
 
   // retry because ipns takes some time to load
   let maxRetries = 5

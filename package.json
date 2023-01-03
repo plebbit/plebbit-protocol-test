@@ -12,7 +12,11 @@
     "prettier": "prettier {src,test,config}/**/*.{cjs,js,jsx,ts,tsx} --config config/prettier.config.js --write"
   },
   "dependencies": {
+    "@babel/core": "7.20.2",
+    "@babel/plugin-transform-runtime": "7.19.6",
+    "@babel/preset-env": "7.20.2",
     "@plebbit/plebbit-js": "https://github.com/plebbit/plebbit-js.git#8c050b36a021a373793cbb0b74479487004c2b6e",
+    "babel-loader": "9.1.0",
     "cborg": "^1.9.6",
     "chai": "4.3.6",
     "chai-string": "^1.5.0",

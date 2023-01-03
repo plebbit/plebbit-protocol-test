@@ -10,7 +10,7 @@ const testFolder = path.resolve(rootFolder, 'test')
 const lockFile = path.resolve(rootFolder, 'package-lock.json')
 
 // all our test files
-const testGlob = testFolder + '/**/*.test.js'
+const testGlob = testFolder + '/node-and-browser/**/*.test.js'
 
 // find all the browser test files and assign them to their own name, don't bundle them
 const testFiles = glob.sync(testGlob).sort()
@@ -60,6 +60,9 @@ module.exports = {
 
             // fix ReferenceError: regeneratorRuntime is not defined
             plugins: ['@babel/plugin-transform-runtime'],
+
+            // fix ReferenceError: exports is not defined
+            sourceType: 'unambiguous',
           },
         },
       },

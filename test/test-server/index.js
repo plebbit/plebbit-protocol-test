@@ -6,6 +6,7 @@ const plebbitDataPath = getTmpFolderPath()
 const startIpfs = require('./start-ipfs')
 const {offlineIpfs, pubsubIpfs} = require('./ipfs-config')
 const signers = require('../fixtures/signers')
+const {ipfsKeyImport} = require('../utils/ipfs')
 
 // always use the same private key and subplebbit address when testing
 const privateKey = signers[0].privateKey
@@ -20,6 +21,16 @@ const privateKey = signers[0].privateKey
     pubsubHttpClientOptions: `http://localhost:${pubsubIpfs.apiPort}/api/v0`,
     // pubsubHttpClientOptions: `https://pubsubprovider.xyz/api/v0`,
     dataPath: plebbitDataPath,
+  }
+
+  // import all keys to ipfs here because the import key api is buggy
+  for (const signer of signers) {
+    await ipfsKeyImport({
+      // use the signer address as the key name to use in the tests
+      keyName: signer.address,
+      privateKey: signer.privateKey,
+      ipfsHttpUrl: plebbitOptions.ipfsHttpClientOptions,
+    })
   }
 
   const plebbit = await Plebbit(plebbitOptions)

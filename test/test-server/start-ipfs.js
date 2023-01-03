@@ -24,6 +24,11 @@ const startIpfs = ({apiPort, gatewayPort, args = ''} = {}) => {
   execSync(`IPFS_PATH=${ipfsDataPath} ${ipfsPath} config Addresses.API /ip4/127.0.0.1/tcp/${apiPort}`, {stdio: 'inherit'})
   execSync(`IPFS_PATH=${ipfsDataPath} ${ipfsPath} config Addresses.Gateway /ip4/127.0.0.1/tcp/${gatewayPort}`, {stdio: 'inherit'})
 
+  // set gateway to not use subdomains
+  execSync(`IPFS_PATH=${ipfsDataPath} ${ipfsPath} config --json Gateway.PublicGateways '{"localhost": {"UseSubdomains": false, "Paths": ["/ipfs", "/ipns"]}}'`, {
+    stdio: 'inherit',
+  })
+
   // start ipfs daemon
   const ipfsProcess = exec(`IPFS_PATH=${ipfsDataPath} ${ipfsPath} daemon ${args}`)
   console.log(`IPFS_PATH=${ipfsDataPath} ${ipfsPath} daemon ${args} process started with pid ${ipfsProcess.pid}`)
