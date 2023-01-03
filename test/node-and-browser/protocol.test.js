@@ -21,11 +21,8 @@ console.log({plebbitOptions, ipfsGatewayUrl})
 const pubsubIpfsClient = IpfsHttpClient.create({url: plebbitOptions.pubsubHttpClientOptions})
 const ipfsClient = IpfsHttpClient.create({url: plebbitOptions.ipfsHttpClientOptions})
 const signers = require('../fixtures/signers')
-const subplebbitSigner = signers[0]
-// don't use a plebbit signer instance, use plain text object to test
-const authorSigner = signers[1]
-const pubsubMessageSigner = signers[2]
 let plebbit
+let publishedCommentCid
 
 describe('protocol (node and browser)', () => {
   before(async () => {
@@ -35,6 +32,10 @@ describe('protocol (node and browser)', () => {
   after(async () => {})
 
   it('create comment and publish over pubsub', async () => {
+    const subplebbitSigner = signers[0]
+    const authorSigner = signers[1]
+    const pubsubMessageSigner = signers[2]
+
     // create comment
     const comment = {
       subplebbitAddress: subplebbitSigner.address,
@@ -165,6 +166,7 @@ describe('protocol (node and browser)', () => {
       )
     )
     console.log({publishedPublication})
+    publishedCommentCid = publishedPublication.cid
 
     // validate challenge verification pubsub message
     expect(publishedPublication.author.address).to.equal(comment.author.address)
@@ -646,15 +648,171 @@ describe('protocol (node and browser)', () => {
     expect(typeof updatedComment.updatedAt).to.equal('number')
   })
 
+  it('create vote and publish over pubsub', async () => {
+    const subplebbitSigner = signers[0]
+    const authorSigner = signers[2]
+    const pubsubMessageSigner = signers[1]
+
+    expect(publishedCommentCid).to.not.equal(undefined, 'publishedCommentCid gets defined in a previous test, cannot run in .only mode')
+
+    // create vote
+    const vote = {
+      subplebbitAddress: subplebbitSigner.address,
+      timestamp: Math.round(Date.now() / 1000),
+      protocolVersion: '1.0.0',
+      commentCid: publishedCommentCid,
+      vote: 1,
+      author: {address: authorSigner.address},
+    }
+
+    // create vote signature
+    const voteSignedPropertyNames = shuffleArray(['subplebbitAddress', 'author', 'timestamp', 'vote', 'commentCid'])
+    const voteSignature = await sign({
+      objectToSign: vote,
+      signedPropertyNames: voteSignedPropertyNames,
+      privateKey: authorSigner.privateKey,
+    })
+    vote.signature = {
+      signature: voteSignature,
+      publicKey: authorSigner.publicKey,
+      type: 'rsa',
+      signedPropertyNames: voteSignedPropertyNames,
+    }
+    console.log({vote})
+
+    // encrypt publication
+    const encryptedPublication = await encrypt(JSON.stringify(vote), subplebbitSigner.publicKey)
+
+    // create pubsub challenge request message
+    const challengeRequestPubsubMessage = {
+      type: 'CHALLENGEREQUEST',
+      challengeRequestId: getRandomString(),
+      acceptedChallengeTypes: ['image'],
+      encryptedPublication: encryptedPublication,
+      protocolVersion: '1.0.0',
+      userAgent: `/protocol-test:1.0.0/`,
+    }
+
+    // create pubsub challenge request message signature
+    const challengeRequestPubsubMessageSignedPropertyNames = shuffleArray(['type', 'challengeRequestId', 'encryptedPublication', 'acceptedChallengeTypes'])
+    const challengeRequestPubsubMessageSignature = await sign({
+      objectToSign: challengeRequestPubsubMessage,
+      signedPropertyNames: challengeRequestPubsubMessageSignedPropertyNames,
+      privateKey: pubsubMessageSigner.privateKey,
+    })
+    challengeRequestPubsubMessage.signature = {
+      signature: challengeRequestPubsubMessageSignature,
+      publicKey: pubsubMessageSigner.publicKey,
+      type: 'rsa',
+      signedPropertyNames: challengeRequestPubsubMessageSignedPropertyNames,
+    }
+    console.log({challengeRequestPubsubMessage})
+
+    // publish pubsub challenge request message
+    const challengePubsubMessage = await publishPubsubMessage(subplebbitSigner.address, challengeRequestPubsubMessage)
+    console.log({challengePubsubMessage})
+
+    // decrypt challenges
+    const challenges = JSON.parse(
+      await decrypt(
+        challengePubsubMessage.encryptedChallenges.encrypted,
+        challengePubsubMessage.encryptedChallenges.encryptedKey,
+        // TODO: change to pubsubMessageSigner.privateKey when plebbit-js bug is fixed
+        authorSigner.privateKey
+      )
+    )
+    console.log({challenges})
+
+    // validate challenge pubsub message
+    expect(challenges[0].challenge).to.equal('1+1=?')
+    expect(challenges[0].type).to.equal('text')
+    expect(challengePubsubMessage.type).to.equal('CHALLENGE')
+    expect(challengePubsubMessage.encryptedChallenges.type).to.equal('aes-cbc')
+    expect(challengePubsubMessage.challengeRequestId).to.equal(challengeRequestPubsubMessage.challengeRequestId)
+
+    // validate challenge pubsub message subplebbit owner signature
+    expect(challengePubsubMessage.signature.type).to.equal('rsa')
+    expect(challengePubsubMessage.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+    expect(challengePubsubMessage.signature.signedPropertyNames).to.include.members(['type', 'challengeRequestId', 'encryptedChallenges'])
+    expect(
+      await verify({
+        objectToSign: challengePubsubMessage,
+        signedPropertyNames: challengePubsubMessage.signature.signedPropertyNames,
+        signature: challengePubsubMessage.signature.signature,
+        publicKey: subplebbitSigner.publicKey,
+      })
+    ).to.equal(true)
+
+    // create pubsub challenge answer message
+    const challengeAnswers = ['2']
+    const encryptedChallengeAnswers = await encrypt(JSON.stringify(challengeAnswers), subplebbitSigner.publicKey)
+    const challengeAnswerPubsubMessage = {
+      type: 'CHALLENGEANSWER',
+      challengeAnswerId: getRandomString(),
+      challengeRequestId: challengeRequestPubsubMessage.challengeRequestId,
+      encryptedChallengeAnswers,
+      protocolVersion: '1.0.0',
+      userAgent: `/protocol-test:1.0.0/`,
+    }
+
+    // create pubsub challenge answer message signature
+    const challengeAnswerPubsubMessageSignedPropertyNames = shuffleArray(['type', 'challengeRequestId', 'challengeAnswerId', 'encryptedChallengeAnswers'])
+    const challengeAnswerPubsubMessageSignature = await sign({
+      objectToSign: challengeAnswerPubsubMessage,
+      signedPropertyNames: challengeAnswerPubsubMessageSignedPropertyNames,
+      privateKey: pubsubMessageSigner.privateKey,
+    })
+    challengeAnswerPubsubMessage.signature = {
+      signature: challengeAnswerPubsubMessageSignature,
+      publicKey: pubsubMessageSigner.publicKey,
+      type: 'rsa',
+      signedPropertyNames: challengeAnswerPubsubMessageSignedPropertyNames,
+    }
+    console.log({challengeAnswerPubsubMessage})
+
+    // publish pubsub challenge answer message
+    const challengeVerificationPubsubMessage = await publishPubsubMessage(subplebbitSigner.address, challengeAnswerPubsubMessage)
+    console.log({challengeVerificationPubsubMessage})
+
+    // validate challenge verification pubsub message
+    expect(challengeVerificationPubsubMessage.type).to.equal('CHALLENGEVERIFICATION')
+    // TODO: challengeVerificationPubsubMessage.encryptedPublication should exist or it deanonymizes votes vs comments
+    expect(challengeVerificationPubsubMessage.encryptedPublication).to.not.equal(undefined)
+    expect(challengeVerificationPubsubMessage.encryptedPublication.encrypted).to.not.equal(undefined)
+    expect(challengeVerificationPubsubMessage.encryptedPublication.type).to.equal('aes-cbc')
+    expect(challengeVerificationPubsubMessage.challengeSuccess).to.equal(true)
+    expect(challengeVerificationPubsubMessage.challengeRequestId).to.equal(challengeAnswerPubsubMessage.challengeRequestId)
+    expect(challengeVerificationPubsubMessage.challengeAnswerId).to.equal(challengeAnswerPubsubMessage.challengeAnswerId)
+
+    // validate challenge verification pubsub message subplebbit owner signature
+    expect(challengeVerificationPubsubMessage.signature.type).to.equal('rsa')
+    expect(challengeVerificationPubsubMessage.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+    expect(challengeVerificationPubsubMessage.signature.signedPropertyNames).to.include.members([
+      'type',
+      'challengeRequestId',
+      'challengeAnswerId',
+      'challengeSuccess',
+      'encryptedPublication',
+      'challengeErrors',
+      'reason',
+    ])
+    expect(
+      await verify({
+        objectToSign: challengeVerificationPubsubMessage,
+        signedPropertyNames: challengeVerificationPubsubMessage.signature.signedPropertyNames,
+        signature: challengeVerificationPubsubMessage.signature.signature,
+        publicKey: subplebbitSigner.publicKey,
+      })
+    ).to.equal(true)
+  })
+
   // TODO:
 
-  // describe('create vote and publish over pubsub', () => {})
+  // it('create author comment edit and publish over pubsub', () => {})
 
-  // describe('create author comment edit and publish over pubsub', () => {})
+  // it('create mod comment edit and publish over pubsub', () => {})
 
-  // describe('create mod comment edit and publish over pubsub', () => {})
-
-  // describe('subplebbit edit and publish over pubsub', () => {})
+  // it('subplebbit edit and publish over pubsub', () => {})
 })
 
 const getBufferToSign = (objectToSign, signedPropertyNames) => {
