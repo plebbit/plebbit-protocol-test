@@ -34,7 +34,7 @@ describe('protocol (node and browser)', () => {
   })
   after(async () => {})
 
-  it.skip('create comment and publish over pubsub', async () => {
+  it('create comment and publish over pubsub', async () => {
     // create comment
     const comment = {
       subplebbitAddress: subplebbitSigner.address,
@@ -299,6 +299,28 @@ describe('protocol (node and browser)', () => {
     // change the subplebbit signer to a sub that isn't running in the test server
     const subplebbitSigner = signers[1]
     const authorSigner = signers[0]
+    const commentIpnsSigner = signers[2]
+
+    // import subplebbit and comment ipns keys into ipfs node using key name = signer.address
+    // ignore failure if key is already imported
+    try {
+      await ipfsKeyImport({
+        keyName: subplebbitSigner.address,
+        privateKey: subplebbitSigner.privateKey,
+        ipfsHttpUrl: plebbitOptions.ipfsHttpClientOptions,
+      })
+    } catch (e) {
+      console.log(e.message)
+    }
+    try {
+      await ipfsKeyImport({
+        keyName: commentIpnsSigner.address,
+        privateKey: commentIpnsSigner.privateKey,
+        ipfsHttpUrl: plebbitOptions.ipfsHttpClientOptions,
+      })
+    } catch (e) {
+      console.log(e.message)
+    }
 
     // create subplebbit ipns object
     const subplebbitIpns = {
@@ -352,16 +374,6 @@ describe('protocol (node and browser)', () => {
     console.log({subplebbitIpns})
 
     // publish ipns
-    try {
-      // ignore failure if key is already imported
-      await ipfsKeyImport({
-        keyName: subplebbitSigner.address,
-        privateKey: subplebbitSigner.privateKey,
-        ipfsHttpUrl: plebbitOptions.ipfsHttpClientOptions,
-      })
-    } catch (e) {
-      console.log(e.message)
-    }
     const subplebbitIpnsFile = await ipfsClient.add(JSON.stringify(subplebbitIpns))
     await ipfsClient.name.publish(subplebbitIpnsFile.path, {
       lifetime: '72h',
@@ -521,7 +533,7 @@ describe('protocol (node and browser)', () => {
     const publicationIpfs = {
       ...challengeRequestPubsubMessage.publication,
       depth: 0,
-      ipnsName: 'ipns name',
+      ipnsName: commentIpnsSigner.address,
     }
     const publicationIpfsFile = await ipfsClient.add(JSON.stringify(subplebbitIpns))
     const publishedPublication = {
@@ -566,15 +578,72 @@ describe('protocol (node and browser)', () => {
     // publish challenge verification pubsub message
     await publishPubsubMessage(subplebbitSigner.address, challengeVerificationPubsubMessage)
     const challengeVerificationEvent = await challengeVerificationPromise
+    await pubsub.unsubscribe()
     console.log({challengeVerificationEvent})
 
     // validate challenge verification event
     expect(challengeVerificationEvent.challengeSuccess).to.equal(true)
     expect(challengeVerificationEvent.publication).to.deep.equal(publishedPublication)
 
-    // validate comment update
+    // create comment ipns object
+    const commentIpns = {
+      upvoteCount: 0,
+      downvoteCount: 0,
+      updatedAt: Math.round(Date.now() / 1000),
+      protocolVersion: '1.0.0',
+    }
 
-    await pubsub.unsubscribe()
+    // create comment ipns signature
+    const commentIpnsSignedPropertyNames = shuffleArray([
+      'authorEdit',
+      'upvoteCount',
+      'downvoteCount',
+      'replies',
+      'replyCount',
+      'flair',
+      'spoiler',
+      'pinned',
+      'locked',
+      'removed',
+      'moderatorReason',
+      'updatedAt',
+      'author',
+    ])
+    const commentIpnsSignature = await sign({
+      objectToSign: commentIpns,
+      signedPropertyNames: commentIpnsSignedPropertyNames,
+      privateKey: subplebbitSigner.privateKey,
+    })
+    commentIpns.signature = {
+      signature: commentIpnsSignature,
+      publicKey: subplebbitSigner.publicKey,
+      type: 'rsa',
+      signedPropertyNames: commentIpnsSignedPropertyNames,
+    }
+    console.log({commentIpns})
+
+    // publish ipns
+    const commentIpnsFile = await ipfsClient.add(JSON.stringify(commentIpns))
+    await ipfsClient.name.publish(commentIpnsFile.path, {
+      lifetime: '72h',
+      key: commentIpnsSigner.address, // ipfs key name
+      allowOffline: true,
+    })
+
+    // validate comment update
+    const commentUpdatePromise = new Promise((resolve) => {
+      comment.on('update', (updatedComment) => {
+        console.log('update event')
+        resolve(updatedComment)
+      })
+    })
+    comment.update().catch(console.error)
+    const updatedComment = await commentUpdatePromise
+    comment.stop()
+    console.log({updatedComment})
+    expect(updatedComment.upvoteCount).to.equal(commentIpns.upvoteCount)
+    expect(updatedComment.downvoteCount).to.equal(commentIpns.downvoteCount)
+    expect(typeof updatedComment.updatedAt).to.equal('number')
   })
 
   // TODO:
