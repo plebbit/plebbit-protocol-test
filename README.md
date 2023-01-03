@@ -1,4 +1,4 @@
-This repo contains extra tests for the plebbit protocol ((https://github.com/plebbit/plebbit-js) to ensure no protocol regression.
+This repo contains extra tests for `plebbit-js` (https://github.com/plebbit/plebbit-js) to ensure no protocol regression.
 
 #### Install
 
