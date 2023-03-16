@@ -10,7 +10,7 @@ try {
   require('util').inspect.defaultOptions.depth = null
 } catch (e) {}
 
-require('../test-server/monitor-test-server')
+const {assertTestServerDidntCrash} = require('../test-server/monitor-test-server')
 const chai = require('chai')
 const {expect} = chai
 chai.use(require('chai-string'))
@@ -46,6 +46,13 @@ describe('protocol (node and browser)', function () {
     plebbit.on('error', console.error)
   })
   after(async () => {})
+
+  beforeEach(async () => {
+    await assertTestServerDidntCrash()
+  })
+  afterEach(async () => {
+    await assertTestServerDidntCrash()
+  })
 
   // publishedCommentCid is defined in this test, add .only if needed
   it('create comment and publish over pubsub', async () => {
