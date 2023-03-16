@@ -1,11 +1,11 @@
 const FormData = require('form-data')
 const fetch = require('node-fetch')
-const {getIpfsKeyFromPrivateKeyPem} = require('./crypto')
+const {getIpfsKeyFromPrivateKey} = require('./crypto')
 
 // ipfs http client key import is bugged
 // this function only works in node, no browser
 const ipfsKeyImport = async ({keyName, privateKey, ipfsHttpUrl}) => {
-  const ipfsKey = await getIpfsKeyFromPrivateKeyPem(privateKey)
+  const ipfsKey = await getIpfsKeyFromPrivateKey(privateKey)
   const data = new FormData()
   data.append('file', ipfsKey)
   const url = `${ipfsHttpUrl}/key/import?arg=${keyName}`

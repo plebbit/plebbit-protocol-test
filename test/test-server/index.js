@@ -1,5 +1,6 @@
 // script to start IPFS and plebbit-js for testing
 
+require('util').inspect.defaultOptions.depth = null
 const Plebbit = require('@plebbit/plebbit-js')
 const getTmpFolderPath = require('tempy').directory
 const plebbitDataPath = getTmpFolderPath()
@@ -34,8 +35,10 @@ const privateKey = signers[0].privateKey
   }
 
   const plebbit = await Plebbit(plebbitOptions)
+  plebbit.on('error', console.log)
   const plebbit2 = await Plebbit(plebbitOptions)
-  const signer = await plebbit.createSigner({privateKey, type: 'rsa'})
+  plebbit2.on('error', console.log)
+  const signer = await plebbit.createSigner({privateKey, type: 'ed25519'})
 
   const dbConfig = {
     client: 'sqlite3',
@@ -78,6 +81,17 @@ const privateKey = signers[0].privateKey
       author: {address: signer.address},
     })
     comment.once('challenge', () => comment.publishChallengeAnswers(['2']))
+
+    // uncomment to log an example of comment update
+    // comment.once('challengeverification', async (challengeVerification) => {
+    //   const commentCid = challengeVerification.publication.cid
+    //   console.log({commentCid})
+    //   const comment = await plebbit.getComment(commentCid)
+    //   console.log({comment})
+    //   comment.on('update', console.log)
+    //   comment.update()
+    // })
+
     await comment.publish()
     console.log('test comment published')
     console.log('test server ready')

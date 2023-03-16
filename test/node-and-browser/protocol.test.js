@@ -1,3 +1,4 @@
+require('util').inspect.defaultOptions.depth = null
 const chai = require('chai')
 const {expect} = chai
 chai.use(require('chai-string'))
@@ -6,10 +7,10 @@ const Plebbit = require('@plebbit/plebbit-js')
 const fetch = require('node-fetch')
 const cborg = require('cborg')
 const IpfsHttpClient = require('ipfs-http-client')
-const {encrypt, decrypt} = require('../utils/encryption')
+const {encryptEd25519AesGcm, decryptEd25519AesGcm} = require('../utils/encryption')
 const {fromString: uint8ArrayFromString} = require('uint8arrays/from-string')
 const {toString: uint8ArrayToString} = require('uint8arrays/to-string')
-const {signBufferRsa, verifyBufferRsa} = require('../utils/signature')
+const {signBufferEd25519, verifyBufferEd25519} = require('../utils/signature')
 const {offlineIpfs, pubsubIpfs} = require('../test-server/ipfs-config')
 const plebbitOptions = {
   ipfsHttpClientOptions: `http://localhost:${offlineIpfs.apiPort}/api/v0`,
@@ -30,6 +31,7 @@ describe('protocol (node and browser)', () => {
   })
   after(async () => {})
 
+  // publishedCommentCid is defined in this test, add .only if needed
   it('create comment and publish over pubsub', async () => {
     const subplebbitSigner = signers[0]
     const authorSigner = signers[1]
@@ -56,26 +58,27 @@ describe('protocol (node and browser)', () => {
     comment.signature = {
       signature: commentSignature,
       publicKey: authorSigner.publicKey,
-      type: 'rsa',
+      type: 'ed25519',
       signedPropertyNames: commentSignedPropertyNames,
     }
     console.log({comment})
 
     // encrypt publication
-    const encryptedPublication = await encrypt(JSON.stringify(comment), subplebbitSigner.publicKey)
+    const encryptedPublication = await encryptEd25519AesGcm(JSON.stringify(comment), pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
 
     // create pubsub challenge request message
     const challengeRequestPubsubMessage = {
       type: 'CHALLENGEREQUEST',
+      timestamp: Math.round(Date.now() / 1000),
       challengeRequestId: getRandomString(),
-      acceptedChallengeTypes: ['image'],
+      acceptedChallengeTypes: ['image/png'],
       encryptedPublication: encryptedPublication,
       protocolVersion: '1.0.0',
       userAgent: `/protocol-test:1.0.0/`,
     }
 
     // create pubsub challenge request message signature
-    const challengeRequestPubsubMessageSignedPropertyNames = shuffleArray(['type', 'challengeRequestId', 'encryptedPublication', 'acceptedChallengeTypes'])
+    const challengeRequestPubsubMessageSignedPropertyNames = shuffleArray(['type', 'timestamp', 'challengeRequestId', 'encryptedPublication', 'acceptedChallengeTypes'])
     const challengeRequestPubsubMessageSignature = await sign({
       objectToSign: challengeRequestPubsubMessage,
       signedPropertyNames: challengeRequestPubsubMessageSignedPropertyNames,
@@ -84,7 +87,7 @@ describe('protocol (node and browser)', () => {
     challengeRequestPubsubMessage.signature = {
       signature: challengeRequestPubsubMessageSignature,
       publicKey: pubsubMessageSigner.publicKey,
-      type: 'rsa',
+      type: 'ed25519',
       signedPropertyNames: challengeRequestPubsubMessageSignedPropertyNames,
     }
     console.log({challengeRequestPubsubMessage})
@@ -94,27 +97,20 @@ describe('protocol (node and browser)', () => {
     console.log({challengePubsubMessage})
 
     // decrypt challenges
-    const challenges = JSON.parse(
-      await decrypt(
-        challengePubsubMessage.encryptedChallenges.encrypted,
-        challengePubsubMessage.encryptedChallenges.encryptedKey,
-        // TODO: change to pubsubMessageSigner.privateKey when plebbit-js bug is fixed
-        authorSigner.privateKey
-      )
-    )
+    const challenges = JSON.parse(await decryptEd25519AesGcm(challengePubsubMessage.encryptedChallenges, pubsubMessageSigner.privateKey, subplebbitSigner.publicKey))
     console.log({challenges})
 
     // validate challenge pubsub message
     expect(challenges[0].challenge).to.equal('1+1=?')
     expect(challenges[0].type).to.equal('text')
     expect(challengePubsubMessage.type).to.equal('CHALLENGE')
-    expect(challengePubsubMessage.encryptedChallenges.type).to.equal('aes-cbc')
+    expect(challengePubsubMessage.encryptedChallenges.type).to.equal('ed25519-aes-gcm')
     expect(challengePubsubMessage.challengeRequestId).to.equal(challengeRequestPubsubMessage.challengeRequestId)
 
     // validate challenge pubsub message subplebbit owner signature
-    expect(challengePubsubMessage.signature.type).to.equal('rsa')
+    expect(challengePubsubMessage.signature.type).to.equal('ed25519')
     expect(challengePubsubMessage.signature.publicKey).to.equal(subplebbitSigner.publicKey)
-    expect(challengePubsubMessage.signature.signedPropertyNames).to.include.members(['type', 'challengeRequestId', 'encryptedChallenges'])
+    expect(challengePubsubMessage.signature.signedPropertyNames).to.include.members(['type', 'timestamp', 'challengeRequestId', 'encryptedChallenges'])
     expect(
       await verify({
         objectToSign: challengePubsubMessage,
@@ -126,9 +122,10 @@ describe('protocol (node and browser)', () => {
 
     // create pubsub challenge answer message
     const challengeAnswers = ['2']
-    const encryptedChallengeAnswers = await encrypt(JSON.stringify(challengeAnswers), subplebbitSigner.publicKey)
+    const encryptedChallengeAnswers = await encryptEd25519AesGcm(JSON.stringify(challengeAnswers), pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
     const challengeAnswerPubsubMessage = {
       type: 'CHALLENGEANSWER',
+      timestamp: Math.round(Date.now() / 1000),
       challengeAnswerId: getRandomString(),
       challengeRequestId: challengeRequestPubsubMessage.challengeRequestId,
       encryptedChallengeAnswers,
@@ -137,7 +134,7 @@ describe('protocol (node and browser)', () => {
     }
 
     // create pubsub challenge answer message signature
-    const challengeAnswerPubsubMessageSignedPropertyNames = shuffleArray(['type', 'challengeRequestId', 'challengeAnswerId', 'encryptedChallengeAnswers'])
+    const challengeAnswerPubsubMessageSignedPropertyNames = shuffleArray(['type', 'timestamp', 'challengeRequestId', 'challengeAnswerId', 'encryptedChallengeAnswers'])
     const challengeAnswerPubsubMessageSignature = await sign({
       objectToSign: challengeAnswerPubsubMessage,
       signedPropertyNames: challengeAnswerPubsubMessageSignedPropertyNames,
@@ -146,7 +143,7 @@ describe('protocol (node and browser)', () => {
     challengeAnswerPubsubMessage.signature = {
       signature: challengeAnswerPubsubMessageSignature,
       publicKey: pubsubMessageSigner.publicKey,
-      type: 'rsa',
+      type: 'ed25519',
       signedPropertyNames: challengeAnswerPubsubMessageSignedPropertyNames,
     }
     console.log({challengeAnswerPubsubMessage})
@@ -157,12 +154,7 @@ describe('protocol (node and browser)', () => {
 
     // decrypt challenge verification publication
     const publishedPublication = JSON.parse(
-      await decrypt(
-        challengeVerificationPubsubMessage.encryptedPublication.encrypted,
-        challengeVerificationPubsubMessage.encryptedPublication.encryptedKey,
-        // TODO: change to pubsubMessageSigner.privateKey when plebbit-js bug is fixed
-        authorSigner.privateKey
-      )
+      await decryptEd25519AesGcm(challengeVerificationPubsubMessage.encryptedPublication, pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
     )
     console.log({publishedPublication})
     publishedCommentCid = publishedPublication.cid
@@ -179,13 +171,13 @@ describe('protocol (node and browser)', () => {
     // TODO: uncomment when plebbit-js bug is fixed
     // expect(publishedPublication.ipnsName).to.startWith('Qm')
     expect(challengeVerificationPubsubMessage.type).to.equal('CHALLENGEVERIFICATION')
-    expect(challengeVerificationPubsubMessage.encryptedPublication.type).to.equal('aes-cbc')
+    expect(challengeVerificationPubsubMessage.encryptedPublication.type).to.equal('ed25519-aes-gcm')
     expect(challengeVerificationPubsubMessage.challengeSuccess).to.equal(true)
     expect(challengeVerificationPubsubMessage.challengeRequestId).to.equal(challengeAnswerPubsubMessage.challengeRequestId)
     expect(challengeVerificationPubsubMessage.challengeAnswerId).to.equal(challengeAnswerPubsubMessage.challengeAnswerId)
 
     // validate challenge verification pubsub message subplebbit owner signature
-    expect(challengeVerificationPubsubMessage.signature.type).to.equal('rsa')
+    expect(challengeVerificationPubsubMessage.signature.type).to.equal('ed25519')
     expect(challengeVerificationPubsubMessage.signature.publicKey).to.equal(subplebbitSigner.publicKey)
     expect(challengeVerificationPubsubMessage.signature.signedPropertyNames).to.include.members([
       'type',
@@ -231,10 +223,10 @@ describe('protocol (node and browser)', () => {
     expect(typeof commentIpns.updatedAt).to.equal('number')
 
     // validate comment ipns signature
-    expect(commentIpns.signature.type).to.equal('rsa')
+    expect(commentIpns.signature.type).to.equal('ed25519')
     expect(commentIpns.signature.publicKey).to.equal(subplebbitSigner.publicKey)
     expect(commentIpns.signature.signedPropertyNames).to.include.members([
-      'authorEdit',
+      'edit',
       'upvoteCount',
       'downvoteCount',
       'replies',
@@ -244,7 +236,7 @@ describe('protocol (node and browser)', () => {
       'pinned',
       'locked',
       'removed',
-      'moderatorReason',
+      'reason',
       'updatedAt',
       'author',
     ])
@@ -266,7 +258,7 @@ describe('protocol (node and browser)', () => {
     expect(typeof subplebbitIpns.updatedAt).to.equal('number')
 
     // validate subplebbit ipns signature
-    expect(subplebbitIpns.signature.type).to.equal('rsa')
+    expect(subplebbitIpns.signature.type).to.equal('ed25519')
     expect(subplebbitIpns.signature.publicKey).to.equal(subplebbitSigner.publicKey)
     expect(subplebbitIpns.signature.signedPropertyNames).to.include.members([
       'address',
@@ -311,7 +303,7 @@ describe('protocol (node and browser)', () => {
       updatedAt: Math.round(Date.now() / 1000),
       protocolVersion: '1.0.0',
       encryption: {
-        type: 'aes-cbc',
+        type: 'ed25519-aes-gcm',
         publicKey: subplebbitSigner.publicKey,
       },
       // TODO: remove posts should be optional
@@ -348,7 +340,7 @@ describe('protocol (node and browser)', () => {
     subplebbitIpns.signature = {
       signature: subplebbitIpnsSignature,
       publicKey: subplebbitSigner.publicKey,
-      type: 'rsa',
+      type: 'ed25519',
       signedPropertyNames: subplebbitIpnsSignedPropertyNames,
     }
     console.log({subplebbitIpns})
@@ -362,7 +354,7 @@ describe('protocol (node and browser)', () => {
     })
 
     // listen for comment over p2p
-    const signer = await plebbit.createSigner({privateKey: authorSigner.privateKey, type: 'rsa'})
+    const signer = await plebbit.createSigner({privateKey: authorSigner.privateKey, type: 'ed25519'})
     const createCommentOptions = {
       subplebbitAddress: subplebbitSigner.address,
       signer,
@@ -370,6 +362,7 @@ describe('protocol (node and browser)', () => {
       content: 'content',
     }
     const comment = await plebbit.createComment({...createCommentOptions})
+    comment.on('error', console.log)
     const pubsub = await pubsubSubscribe(subplebbitSigner.address)
     comment.on('challenge', (challenge) => {
       console.log('challenge event')
@@ -386,21 +379,17 @@ describe('protocol (node and browser)', () => {
 
     // decrypt publication
     challengeRequestPubsubMessage.publication = JSON.parse(
-      await decrypt(
-        challengeRequestPubsubMessage.encryptedPublication.encrypted,
-        challengeRequestPubsubMessage.encryptedPublication.encryptedKey,
-        subplebbitSigner.privateKey
-      )
+      await decryptEd25519AesGcm(challengeRequestPubsubMessage.encryptedPublication, subplebbitSigner.privateKey, challengeRequestPubsubMessage.signature.publicKey)
     )
     console.log({challengeRequestPubsubMessage})
 
     // validate challenge request pubsub message
     expect(challengeRequestPubsubMessage.type).to.equal('CHALLENGEREQUEST')
-    expect(challengeRequestPubsubMessage.encryptedPublication.type).to.equal('aes-cbc')
+    expect(challengeRequestPubsubMessage.encryptedPublication.type).to.equal('ed25519-aes-gcm')
     expect(typeof challengeRequestPubsubMessage.challengeRequestId).to.equal('string')
 
     // validate challenge request pubsub message signature
-    expect(challengeRequestPubsubMessage.signature.type).to.equal('rsa')
+    expect(challengeRequestPubsubMessage.signature.type).to.equal('ed25519')
     // TODO: pubsub message signer should not be the publication signer or loss of anonymity
     // expect(challengeRequestPubsubMessage.signature.publicKey).to.not.equal(authorSigner.publicKey)
     expect(challengeRequestPubsubMessage.signature.signedPropertyNames).to.include.members([
@@ -446,9 +435,10 @@ describe('protocol (node and browser)', () => {
 
     // create challenge pusub message
     const challenges = [{challenge: '1+1=?', type: 'text'}]
-    const encryptedChallenges = await encrypt(JSON.stringify(challenges), challengeRequestPubsubMessage.signature.publicKey)
+    const encryptedChallenges = await encryptEd25519AesGcm(JSON.stringify(challenges), subplebbitSigner.privateKey, challengeRequestPubsubMessage.signature.publicKey)
     const challengePubsubMessage = {
       type: 'CHALLENGE',
+      timestamp: Math.round(Date.now() / 1000),
       challengeRequestId: challengeRequestPubsubMessage.challengeRequestId,
       encryptedChallenges,
       protocolVersion: '1.0.0',
@@ -456,7 +446,7 @@ describe('protocol (node and browser)', () => {
     }
 
     // create pubsub challenge message signature
-    const challengePubsubMessageSignedPropertyNames = shuffleArray(['type', 'challengeRequestId', 'encryptedChallenges'])
+    const challengePubsubMessageSignedPropertyNames = shuffleArray(['type', 'timestamp', 'challengeRequestId', 'encryptedChallenges'])
     const challengePubsubMessageSignature = await sign({
       objectToSign: challengePubsubMessage,
       signedPropertyNames: challengePubsubMessageSignedPropertyNames,
@@ -465,7 +455,7 @@ describe('protocol (node and browser)', () => {
     challengePubsubMessage.signature = {
       signature: challengePubsubMessageSignature,
       publicKey: subplebbitSigner.publicKey,
-      type: 'rsa',
+      type: 'ed25519',
       signedPropertyNames: challengePubsubMessageSignedPropertyNames,
     }
     console.log({challengePubsubMessage})
@@ -475,23 +465,19 @@ describe('protocol (node and browser)', () => {
 
     // decrypt challenge answers
     challengeAnswerPubsubMessage.challengeAnswers = JSON.parse(
-      await decrypt(
-        challengeAnswerPubsubMessage.encryptedChallengeAnswers.encrypted,
-        challengeAnswerPubsubMessage.encryptedChallengeAnswers.encryptedKey,
-        subplebbitSigner.privateKey
-      )
+      await decryptEd25519AesGcm(challengeAnswerPubsubMessage.encryptedChallengeAnswers, subplebbitSigner.privateKey, challengeRequestPubsubMessage.signature.publicKey)
     )
     console.log({challengeAnswerPubsubMessage})
 
     // validate challenge answer pubsub message
     expect(challengeAnswerPubsubMessage.type).to.equal('CHALLENGEANSWER')
-    expect(challengeAnswerPubsubMessage.encryptedChallengeAnswers.type).to.equal('aes-cbc')
+    expect(challengeAnswerPubsubMessage.encryptedChallengeAnswers.type).to.equal('ed25519-aes-gcm')
     expect(challengeAnswerPubsubMessage.challengeRequestId).to.equal(challengeRequestPubsubMessage.challengeRequestId)
     expect(typeof challengeAnswerPubsubMessage.challengeAnswerId).to.equal('string')
     expect(challengeAnswerPubsubMessage.challengeAnswers).to.deep.equal(['2'])
 
     // validate challenge answer pubsub message signature
-    expect(challengeAnswerPubsubMessage.signature.type).to.equal('rsa')
+    expect(challengeAnswerPubsubMessage.signature.type).to.equal('ed25519')
     // the pubsub message signer is the same as the original challenge request id
     expect(challengeAnswerPubsubMessage.signature.publicKey).to.equal(challengeRequestPubsubMessage.signature.publicKey)
     expect(challengeAnswerPubsubMessage.signature.signedPropertyNames).to.include.members([
@@ -521,11 +507,16 @@ describe('protocol (node and browser)', () => {
       cid: publicationIpfsFile.path,
     }
     console.log({publishedPublication})
-    const encryptedPublishedPublication = await encrypt(JSON.stringify(publishedPublication), challengeRequestPubsubMessage.signature.publicKey)
+    const encryptedPublishedPublication = await encryptEd25519AesGcm(
+      JSON.stringify(publishedPublication),
+      subplebbitSigner.privateKey,
+      challengeRequestPubsubMessage.signature.publicKey
+    )
 
     // create challenge verification pubsub message
     const challengeVerificationPubsubMessage = {
       type: 'CHALLENGEVERIFICATION',
+      timestamp: Math.round(Date.now() / 1000),
       challengeRequestId: challengeAnswerPubsubMessage.challengeRequestId,
       challengeAnswerId: challengeAnswerPubsubMessage.challengeAnswerId,
       challengeSuccess: true,
@@ -550,7 +541,7 @@ describe('protocol (node and browser)', () => {
     challengeVerificationPubsubMessage.signature = {
       signature: challengeVerificationPubsubMessageSignature,
       publicKey: subplebbitSigner.publicKey,
-      type: 'rsa',
+      type: 'ed25519',
       signedPropertyNames: challengeVerificationPubsubMessageSignedPropertyNames,
     }
     console.log({challengeVerificationPubsubMessage})
@@ -567,15 +558,18 @@ describe('protocol (node and browser)', () => {
 
     // create comment ipns object
     const commentIpns = {
+      cid: publishedPublication.cid,
+      // TODO: author should be optional, needs to be fixed in plebbit-js
+      author: {},
       upvoteCount: 0,
-      downvoteCount: 0,
       updatedAt: Math.round(Date.now() / 1000),
       protocolVersion: '1.0.0',
     }
 
     // create comment ipns signature
     const commentIpnsSignedPropertyNames = shuffleArray([
-      'authorEdit',
+      'cid',
+      'edit',
       'upvoteCount',
       'downvoteCount',
       'replies',
@@ -585,7 +579,7 @@ describe('protocol (node and browser)', () => {
       'pinned',
       'locked',
       'removed',
-      'moderatorReason',
+      'reason',
       'updatedAt',
       'author',
     ])
@@ -597,7 +591,7 @@ describe('protocol (node and browser)', () => {
     commentIpns.signature = {
       signature: commentIpnsSignature,
       publicKey: subplebbitSigner.publicKey,
-      type: 'rsa',
+      type: 'ed25519',
       signedPropertyNames: commentIpnsSignedPropertyNames,
     }
     console.log({commentIpns})
@@ -619,6 +613,9 @@ describe('protocol (node and browser)', () => {
     })
     comment.update().catch(console.error)
     const updatedComment = await commentUpdatePromise
+
+    console.log('after update')
+
     comment.stop()
     console.log({updatedComment})
     expect(updatedComment.upvoteCount).to.equal(commentIpns.upvoteCount)
@@ -653,26 +650,27 @@ describe('protocol (node and browser)', () => {
     vote.signature = {
       signature: voteSignature,
       publicKey: authorSigner.publicKey,
-      type: 'rsa',
+      type: 'ed25519',
       signedPropertyNames: voteSignedPropertyNames,
     }
     console.log({vote})
 
     // encrypt publication
-    const encryptedPublication = await encrypt(JSON.stringify(vote), subplebbitSigner.publicKey)
+    const encryptedPublication = await encryptEd25519AesGcm(JSON.stringify(vote), pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
 
     // create pubsub challenge request message
     const challengeRequestPubsubMessage = {
       type: 'CHALLENGEREQUEST',
+      timestamp: Math.round(Date.now() / 1000),
       challengeRequestId: getRandomString(),
-      acceptedChallengeTypes: ['image'],
+      acceptedChallengeTypes: ['image/png'],
       encryptedPublication: encryptedPublication,
       protocolVersion: '1.0.0',
       userAgent: `/protocol-test:1.0.0/`,
     }
 
     // create pubsub challenge request message signature
-    const challengeRequestPubsubMessageSignedPropertyNames = shuffleArray(['type', 'challengeRequestId', 'encryptedPublication', 'acceptedChallengeTypes'])
+    const challengeRequestPubsubMessageSignedPropertyNames = shuffleArray(['type', 'timestamp', 'challengeRequestId', 'encryptedPublication', 'acceptedChallengeTypes'])
     const challengeRequestPubsubMessageSignature = await sign({
       objectToSign: challengeRequestPubsubMessage,
       signedPropertyNames: challengeRequestPubsubMessageSignedPropertyNames,
@@ -681,7 +679,7 @@ describe('protocol (node and browser)', () => {
     challengeRequestPubsubMessage.signature = {
       signature: challengeRequestPubsubMessageSignature,
       publicKey: pubsubMessageSigner.publicKey,
-      type: 'rsa',
+      type: 'ed25519',
       signedPropertyNames: challengeRequestPubsubMessageSignedPropertyNames,
     }
     console.log({challengeRequestPubsubMessage})
@@ -691,27 +689,20 @@ describe('protocol (node and browser)', () => {
     console.log({challengePubsubMessage})
 
     // decrypt challenges
-    const challenges = JSON.parse(
-      await decrypt(
-        challengePubsubMessage.encryptedChallenges.encrypted,
-        challengePubsubMessage.encryptedChallenges.encryptedKey,
-        // TODO: change to pubsubMessageSigner.privateKey when plebbit-js bug is fixed
-        authorSigner.privateKey
-      )
-    )
+    const challenges = JSON.parse(await decryptEd25519AesGcm(challengePubsubMessage.encryptedChallenges, pubsubMessageSigner.privateKey, subplebbitSigner.publicKey))
     console.log({challenges})
 
     // validate challenge pubsub message
     expect(challenges[0].challenge).to.equal('1+1=?')
     expect(challenges[0].type).to.equal('text')
     expect(challengePubsubMessage.type).to.equal('CHALLENGE')
-    expect(challengePubsubMessage.encryptedChallenges.type).to.equal('aes-cbc')
+    expect(challengePubsubMessage.encryptedChallenges.type).to.equal('ed25519-aes-gcm')
     expect(challengePubsubMessage.challengeRequestId).to.equal(challengeRequestPubsubMessage.challengeRequestId)
 
     // validate challenge pubsub message subplebbit owner signature
-    expect(challengePubsubMessage.signature.type).to.equal('rsa')
+    expect(challengePubsubMessage.signature.type).to.equal('ed25519')
     expect(challengePubsubMessage.signature.publicKey).to.equal(subplebbitSigner.publicKey)
-    expect(challengePubsubMessage.signature.signedPropertyNames).to.include.members(['type', 'challengeRequestId', 'encryptedChallenges'])
+    expect(challengePubsubMessage.signature.signedPropertyNames).to.include.members(['type', 'timestamp', 'challengeRequestId', 'encryptedChallenges'])
     expect(
       await verify({
         objectToSign: challengePubsubMessage,
@@ -723,9 +714,10 @@ describe('protocol (node and browser)', () => {
 
     // create pubsub challenge answer message
     const challengeAnswers = ['2']
-    const encryptedChallengeAnswers = await encrypt(JSON.stringify(challengeAnswers), subplebbitSigner.publicKey)
+    const encryptedChallengeAnswers = await encryptEd25519AesGcm(JSON.stringify(challengeAnswers), pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
     const challengeAnswerPubsubMessage = {
       type: 'CHALLENGEANSWER',
+      timestamp: Math.round(Date.now() / 1000),
       challengeAnswerId: getRandomString(),
       challengeRequestId: challengeRequestPubsubMessage.challengeRequestId,
       encryptedChallengeAnswers,
@@ -734,7 +726,7 @@ describe('protocol (node and browser)', () => {
     }
 
     // create pubsub challenge answer message signature
-    const challengeAnswerPubsubMessageSignedPropertyNames = shuffleArray(['type', 'challengeRequestId', 'challengeAnswerId', 'encryptedChallengeAnswers'])
+    const challengeAnswerPubsubMessageSignedPropertyNames = shuffleArray(['type', 'timestamp', 'challengeRequestId', 'challengeAnswerId', 'encryptedChallengeAnswers'])
     const challengeAnswerPubsubMessageSignature = await sign({
       objectToSign: challengeAnswerPubsubMessage,
       signedPropertyNames: challengeAnswerPubsubMessageSignedPropertyNames,
@@ -743,7 +735,7 @@ describe('protocol (node and browser)', () => {
     challengeAnswerPubsubMessage.signature = {
       signature: challengeAnswerPubsubMessageSignature,
       publicKey: pubsubMessageSigner.publicKey,
-      type: 'rsa',
+      type: 'ed25519',
       signedPropertyNames: challengeAnswerPubsubMessageSignedPropertyNames,
     }
     console.log({challengeAnswerPubsubMessage})
@@ -754,18 +746,18 @@ describe('protocol (node and browser)', () => {
 
     // validate challenge verification pubsub message
     expect(challengeVerificationPubsubMessage.type).to.equal('CHALLENGEVERIFICATION')
-    expect(challengeVerificationPubsubMessage.encryptedPublication).to.not.equal(undefined)
-    expect(challengeVerificationPubsubMessage.encryptedPublication?.encrypted).to.not.equal(undefined)
-    expect(challengeVerificationPubsubMessage.encryptedPublication?.type).to.equal('aes-cbc')
+    // no point in sending back encrypted vote in verification
+    expect(challengeVerificationPubsubMessage.encryptedPublication).to.equal(undefined)
     expect(challengeVerificationPubsubMessage.challengeSuccess).to.equal(true)
     expect(challengeVerificationPubsubMessage.challengeRequestId).to.equal(challengeAnswerPubsubMessage.challengeRequestId)
     expect(challengeVerificationPubsubMessage.challengeAnswerId).to.equal(challengeAnswerPubsubMessage.challengeAnswerId)
 
     // validate challenge verification pubsub message subplebbit owner signature
-    expect(challengeVerificationPubsubMessage.signature.type).to.equal('rsa')
+    expect(challengeVerificationPubsubMessage.signature.type).to.equal('ed25519')
     expect(challengeVerificationPubsubMessage.signature.publicKey).to.equal(subplebbitSigner.publicKey)
     expect(challengeVerificationPubsubMessage.signature.signedPropertyNames).to.include.members([
       'type',
+      'timestamp',
       'challengeRequestId',
       'challengeAnswerId',
       'challengeSuccess',
@@ -815,7 +807,7 @@ describe('protocol (node and browser)', () => {
       'pinned',
       'locked',
       'removed',
-      'moderatorReason',
+      'reason',
       'commentAuthor',
     ])
     const commentEditSignature = await sign({
@@ -826,26 +818,27 @@ describe('protocol (node and browser)', () => {
     commentEdit.signature = {
       signature: commentEditSignature,
       publicKey: authorSigner.publicKey,
-      type: 'rsa',
+      type: 'ed25519',
       signedPropertyNames: commentEditSignedPropertyNames,
     }
     console.log({commentEdit})
 
     // encrypt publication
-    const encryptedPublication = await encrypt(JSON.stringify(commentEdit), subplebbitSigner.publicKey)
+    const encryptedPublication = await encryptEd25519AesGcm(JSON.stringify(commentEdit), pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
 
     // create pubsub challenge request message
     const challengeRequestPubsubMessage = {
       type: 'CHALLENGEREQUEST',
+      timestamp: Math.round(Date.now() / 1000),
       challengeRequestId: getRandomString(),
-      acceptedChallengeTypes: ['image'],
+      acceptedChallengeTypes: ['image/png'],
       encryptedPublication: encryptedPublication,
       protocolVersion: '1.0.0',
       userAgent: `/protocol-test:1.0.0/`,
     }
 
     // create pubsub challenge request message signature
-    const challengeRequestPubsubMessageSignedPropertyNames = shuffleArray(['type', 'challengeRequestId', 'encryptedPublication', 'acceptedChallengeTypes'])
+    const challengeRequestPubsubMessageSignedPropertyNames = shuffleArray(['type', 'timestamp', 'challengeRequestId', 'encryptedPublication', 'acceptedChallengeTypes'])
     const challengeRequestPubsubMessageSignature = await sign({
       objectToSign: challengeRequestPubsubMessage,
       signedPropertyNames: challengeRequestPubsubMessageSignedPropertyNames,
@@ -854,7 +847,7 @@ describe('protocol (node and browser)', () => {
     challengeRequestPubsubMessage.signature = {
       signature: challengeRequestPubsubMessageSignature,
       publicKey: pubsubMessageSigner.publicKey,
-      type: 'rsa',
+      type: 'ed25519',
       signedPropertyNames: challengeRequestPubsubMessageSignedPropertyNames,
     }
     console.log({challengeRequestPubsubMessage})
@@ -864,27 +857,20 @@ describe('protocol (node and browser)', () => {
     console.log({challengePubsubMessage})
 
     // decrypt challenges
-    const challenges = JSON.parse(
-      await decrypt(
-        challengePubsubMessage.encryptedChallenges.encrypted,
-        challengePubsubMessage.encryptedChallenges.encryptedKey,
-        // TODO: change to pubsubMessageSigner.privateKey when plebbit-js bug is fixed
-        authorSigner.privateKey
-      )
-    )
+    const challenges = JSON.parse(await decryptEd25519AesGcm(challengePubsubMessage.encryptedChallenges, pubsubMessageSigner.privateKey, subplebbitSigner.publicKey))
     console.log({challenges})
 
     // validate challenge pubsub message
     expect(challenges[0].challenge).to.equal('1+1=?')
     expect(challenges[0].type).to.equal('text')
     expect(challengePubsubMessage.type).to.equal('CHALLENGE')
-    expect(challengePubsubMessage.encryptedChallenges.type).to.equal('aes-cbc')
+    expect(challengePubsubMessage.encryptedChallenges.type).to.equal('ed25519-aes-gcm')
     expect(challengePubsubMessage.challengeRequestId).to.equal(challengeRequestPubsubMessage.challengeRequestId)
 
     // validate challenge pubsub message subplebbit owner signature
-    expect(challengePubsubMessage.signature.type).to.equal('rsa')
+    expect(challengePubsubMessage.signature.type).to.equal('ed25519')
     expect(challengePubsubMessage.signature.publicKey).to.equal(subplebbitSigner.publicKey)
-    expect(challengePubsubMessage.signature.signedPropertyNames).to.include.members(['type', 'challengeRequestId', 'encryptedChallenges'])
+    expect(challengePubsubMessage.signature.signedPropertyNames).to.include.members(['type', 'timestamp', 'challengeRequestId', 'encryptedChallenges'])
     expect(
       await verify({
         objectToSign: challengePubsubMessage,
@@ -896,9 +882,10 @@ describe('protocol (node and browser)', () => {
 
     // create pubsub challenge answer message
     const challengeAnswers = ['2']
-    const encryptedChallengeAnswers = await encrypt(JSON.stringify(challengeAnswers), subplebbitSigner.publicKey)
+    const encryptedChallengeAnswers = await encryptEd25519AesGcm(JSON.stringify(challengeAnswers), pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
     const challengeAnswerPubsubMessage = {
       type: 'CHALLENGEANSWER',
+      timestamp: Math.round(Date.now() / 1000),
       challengeAnswerId: getRandomString(),
       challengeRequestId: challengeRequestPubsubMessage.challengeRequestId,
       encryptedChallengeAnswers,
@@ -907,7 +894,7 @@ describe('protocol (node and browser)', () => {
     }
 
     // create pubsub challenge answer message signature
-    const challengeAnswerPubsubMessageSignedPropertyNames = shuffleArray(['type', 'challengeRequestId', 'challengeAnswerId', 'encryptedChallengeAnswers'])
+    const challengeAnswerPubsubMessageSignedPropertyNames = shuffleArray(['type', 'timestamp', 'challengeRequestId', 'challengeAnswerId', 'encryptedChallengeAnswers'])
     const challengeAnswerPubsubMessageSignature = await sign({
       objectToSign: challengeAnswerPubsubMessage,
       signedPropertyNames: challengeAnswerPubsubMessageSignedPropertyNames,
@@ -916,7 +903,7 @@ describe('protocol (node and browser)', () => {
     challengeAnswerPubsubMessage.signature = {
       signature: challengeAnswerPubsubMessageSignature,
       publicKey: pubsubMessageSigner.publicKey,
-      type: 'rsa',
+      type: 'ed25519',
       signedPropertyNames: challengeAnswerPubsubMessageSignedPropertyNames,
     }
     console.log({challengeAnswerPubsubMessage})
@@ -927,18 +914,18 @@ describe('protocol (node and browser)', () => {
 
     // validate challenge verification pubsub message
     expect(challengeVerificationPubsubMessage.type).to.equal('CHALLENGEVERIFICATION')
-    expect(challengeVerificationPubsubMessage.encryptedPublication).to.not.equal(undefined)
-    expect(challengeVerificationPubsubMessage.encryptedPublication?.encrypted).to.not.equal(undefined)
-    expect(challengeVerificationPubsubMessage.encryptedPublication?.type).to.equal('aes-cbc')
+    // no point in sending back encrypted comment edit in verification
+    expect(challengeVerificationPubsubMessage.encryptedPublication).to.equal(undefined)
     expect(challengeVerificationPubsubMessage.challengeSuccess).to.equal(true)
     expect(challengeVerificationPubsubMessage.challengeRequestId).to.equal(challengeAnswerPubsubMessage.challengeRequestId)
     expect(challengeVerificationPubsubMessage.challengeAnswerId).to.equal(challengeAnswerPubsubMessage.challengeAnswerId)
 
     // validate challenge verification pubsub message subplebbit owner signature
-    expect(challengeVerificationPubsubMessage.signature.type).to.equal('rsa')
+    expect(challengeVerificationPubsubMessage.signature.type).to.equal('ed25519')
     expect(challengeVerificationPubsubMessage.signature.publicKey).to.equal(subplebbitSigner.publicKey)
     expect(challengeVerificationPubsubMessage.signature.signedPropertyNames).to.include.members([
       'type',
+      'timestamp',
       'challengeRequestId',
       'challengeAnswerId',
       'challengeSuccess',
@@ -959,23 +946,23 @@ describe('protocol (node and browser)', () => {
     const commentIpfs = await fetchJson(`${ipfsGatewayUrl}/ipfs/${publishedCommentCid}`)
     let commentIpns
     // wait until latest author edit is published (multiple tests use the same comment)
-    while (!commentIpns?.authorEdit || commentIpns.authorEdit.timestamp !== commentEdit.timestamp) {
+    while (!commentIpns?.edit || commentIpns.edit.timestamp !== commentEdit.timestamp) {
       commentIpns = await fetchJson(`${ipfsGatewayUrl}/ipns/${commentIpfs.ipnsName}`)
     }
     console.log({commentIpns})
 
     // validate author edit
-    expect(commentIpns.authorEdit.author).to.deep.equal(commentEdit.author)
-    expect(commentIpns.authorEdit.commentCid).to.equal(commentEdit.commentCid)
-    expect(commentIpns.authorEdit.reason).to.equal(commentEdit.reason)
-    expect(commentIpns.authorEdit.timestamp).to.equal(commentEdit.timestamp)
-    expect(commentIpns.authorEdit.subplebbitAddress).to.equal(commentEdit.subplebbitAddress)
-    expect(commentIpns.authorEdit.signature).to.deep.equal(commentEdit.signature)
+    expect(commentIpns.edit.author).to.deep.equal(commentEdit.author)
+    expect(commentIpns.edit.commentCid).to.equal(commentEdit.commentCid)
+    expect(commentIpns.edit.reason).to.equal(commentEdit.reason)
+    expect(commentIpns.edit.timestamp).to.equal(commentEdit.timestamp)
+    expect(commentIpns.edit.subplebbitAddress).to.equal(commentEdit.subplebbitAddress)
+    expect(commentIpns.edit.signature).to.deep.equal(commentEdit.signature)
 
     // validate author edit signature
-    expect(commentIpns.authorEdit.signature.type).to.equal('rsa')
-    expect(commentIpns.authorEdit.signature.publicKey).to.equal(authorSigner.publicKey)
-    expect(commentIpns.authorEdit.signature.signedPropertyNames).to.include.members([
+    expect(commentIpns.edit.signature.type).to.equal('ed25519')
+    expect(commentIpns.edit.signature.publicKey).to.equal(authorSigner.publicKey)
+    expect(commentIpns.edit.signature.signedPropertyNames).to.include.members([
       'subplebbitAddress',
       'author',
       'timestamp',
@@ -988,14 +975,13 @@ describe('protocol (node and browser)', () => {
       'pinned',
       'locked',
       'removed',
-      'moderatorReason',
       'commentAuthor',
     ])
     expect(
       await verify({
-        objectToSign: commentIpns.authorEdit,
-        signedPropertyNames: commentIpns.authorEdit.signature.signedPropertyNames,
-        signature: commentIpns.authorEdit.signature.signature,
+        objectToSign: commentIpns.edit,
+        signedPropertyNames: commentIpns.edit.signature.signedPropertyNames,
+        signature: commentIpns.edit.signature.signature,
         publicKey: authorSigner.publicKey,
       })
     ).to.equal(true)
@@ -1007,7 +993,9 @@ describe('protocol (node and browser)', () => {
 const getBufferToSign = (objectToSign, signedPropertyNames) => {
   const propsToSign = {}
   for (const propertyName of signedPropertyNames) {
-    propsToSign[propertyName] = objectToSign[propertyName]
+    if (objectToSign[propertyName] !== null && objectToSign[propertyName] !== undefined) {
+      propsToSign[propertyName] = objectToSign[propertyName]
+    }
   }
   // console.log({propsToSign})
   const bufferToSign = cborg.encode(propsToSign)
@@ -1016,7 +1004,7 @@ const getBufferToSign = (objectToSign, signedPropertyNames) => {
 
 const sign = async ({objectToSign, signedPropertyNames, privateKey}) => {
   const bufferToSign = getBufferToSign(objectToSign, signedPropertyNames)
-  const signatureBuffer = await signBufferRsa(bufferToSign, privateKey)
+  const signatureBuffer = await signBufferEd25519(bufferToSign, privateKey)
   const signatureBase64 = uint8ArrayToString(signatureBuffer, 'base64')
   return signatureBase64
 }
@@ -1024,7 +1012,7 @@ const sign = async ({objectToSign, signedPropertyNames, privateKey}) => {
 const verify = async ({objectToSign, signedPropertyNames, signature, publicKey}) => {
   const bufferToSign = getBufferToSign(objectToSign, signedPropertyNames)
   const signatureAsBuffer = uint8ArrayFromString(signature, 'base64')
-  const res = await verifyBufferRsa(bufferToSign, signatureAsBuffer, publicKey)
+  const res = await verifyBufferEd25519(bufferToSign, signatureAsBuffer, publicKey)
   return res
 }
 
