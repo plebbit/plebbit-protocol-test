@@ -1,3 +1,10 @@
+// polyfill window.process for "assert" package
+try {
+  if (!window.process?.env) {
+    window.process = {env: {}}
+  }
+} catch (e) {}
+
 require('util').inspect.defaultOptions.depth = null
 const chai = require('chai')
 const {expect} = chai
@@ -294,13 +301,14 @@ describe('protocol (node and browser)', () => {
 
     // validate included posts
     expect(subplebbitIpns.posts.pages.hot.comments.length).to.be.greaterThan(0)
-    expect(subplebbitIpns.posts.pages.hot.comments[0].comment.cid).to.equal(publishedCommentCid)
+    const pageComment = subplebbitIpns.posts.pages.hot.comments.filter((pageComment) => pageComment.comment.cid === publishedCommentCid)[0]
+    expect(pageComment.comment.cid).to.equal(publishedCommentCid)
     for (const propertyName in comment) {
-      expect(subplebbitIpns.posts.pages.hot.comments[0].comment[propertyName]).to.deep.equal(comment[propertyName])
+      expect(pageComment.comment[propertyName]).to.deep.equal(comment[propertyName])
     }
-    expect(subplebbitIpns.posts.pages.hot.comments[0].commentUpdate.cid).to.equal(publishedCommentCid)
-    expect(typeof subplebbitIpns.posts.pages.hot.comments[0].commentUpdate.updatedAt).to.equal('number')
-    expect(subplebbitIpns.posts.pages.hot.comments[0].commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+    expect(pageComment.commentUpdate.cid).to.equal(publishedCommentCid)
+    expect(typeof pageComment.commentUpdate.updatedAt).to.equal('number')
+    expect(pageComment.commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
 
     // fetch page ipfs
     expect(typeof subplebbitIpns.posts.pageCids.new).to.equal('string')
