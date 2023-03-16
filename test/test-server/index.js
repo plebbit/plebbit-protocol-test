@@ -100,7 +100,10 @@ const privateKey = signers[0].privateKey
     // to know when the test server is finished getting ready
     // and able to start the automated tests
     require('http')
-      .createServer((req, res) => res.end('test server ready'))
+      .createServer((req, res) => {
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.end('test server ready')
+      })
       .listen(59281)
   })
 })()
