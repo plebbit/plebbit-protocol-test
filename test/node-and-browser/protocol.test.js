@@ -306,6 +306,9 @@ describe('protocol (node and browser)', () => {
     // validate included posts
     expect(subplebbitIpns.posts.pages.hot.comments.length).to.be.greaterThan(0)
     const pageComment = subplebbitIpns.posts.pages.hot.comments.filter((pageComment) => pageComment.comment.cid === publishedCommentCid)[0]
+    if (!pageComment) {
+      throw Error('comment is not in first page, must restart test server')
+    }
     expect(pageComment.comment.cid).to.equal(publishedCommentCid)
     for (const propertyName in comment) {
       expect(pageComment.comment[propertyName]).to.deep.equal(comment[propertyName])
@@ -439,15 +442,18 @@ describe('protocol (node and browser)', () => {
 
     // fetch parent comment ipns until it has reply
     let parentCommentIpns
-    while (true) {
+    let maxAttempt = 50
+    while (maxAttempt--) {
       parentCommentIpns = await fetchJson(`${ipfsGatewayUrl}/ipns/${publishedCommentIpnsName}`)
       if (parentCommentIpns?.replyCount > 0) {
         break
       }
+      await new Promise((r) => setTimeout(r, 100)) // sleep
     }
     console.log({parentCommentIpns})
 
     // validate parent comment ipns
+    expect(parentCommentIpns).to.not.equal(undefined)
     expect(parentCommentIpns.replyCount).to.equal(1)
     expect(typeof parentCommentIpns.updatedAt).to.equal('number')
 
