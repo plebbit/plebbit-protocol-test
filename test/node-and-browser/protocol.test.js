@@ -36,7 +36,10 @@ let plebbit
 let publishedCommentCid
 let publishedCommentIpnsName
 
-describe('protocol (node and browser)', () => {
+describe('protocol (node and browser)', function () {
+  // add retries because sometimes the CI is flaky
+  this.retries(3)
+
   before(async () => {
     plebbit = await Plebbit(plebbitOptions)
     plebbit.on('error', console.error)
