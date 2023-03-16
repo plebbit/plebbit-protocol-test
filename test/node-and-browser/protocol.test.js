@@ -1317,7 +1317,7 @@ const fetchJson = async (url) => {
     })
 
   // retry because ipns takes some time to load
-  let maxRetries = 5
+  let maxRetries = 20
   while (true) {
     try {
       const res = await _fetchJson(url)
