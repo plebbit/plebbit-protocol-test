@@ -1305,6 +1305,7 @@ const fetchJson = async (url) => {
     fetch(url, {
       // ipfs tries to redirect to <cid>.localhost
       redirect: 'manual',
+      cache: 'no-cache',
     }).then(async (res) => {
       const text = await res.text()
       try {
