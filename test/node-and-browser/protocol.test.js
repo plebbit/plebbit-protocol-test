@@ -168,8 +168,7 @@ describe('protocol (node and browser)', () => {
     expect(publishedPublication.subplebbitAddress).to.equal(comment.subplebbitAddress)
     expect(publishedPublication.signature).to.deep.equal(comment.signature)
     expect(publishedPublication.cid).to.startWith('Qm')
-    // TODO: uncomment when plebbit-js bug is fixed
-    // expect(publishedPublication.ipnsName).to.startWith('Qm')
+    expect(publishedPublication.ipnsName).to.startWith('12D3KooW')
     expect(challengeVerificationPubsubMessage.type).to.equal('CHALLENGEVERIFICATION')
     expect(challengeVerificationPubsubMessage.encryptedPublication.type).to.equal('ed25519-aes-gcm')
     expect(challengeVerificationPubsubMessage.challengeSuccess).to.equal(true)
@@ -306,8 +305,6 @@ describe('protocol (node and browser)', () => {
         type: 'ed25519-aes-gcm',
         publicKey: subplebbitSigner.publicKey,
       },
-      // TODO: remove posts should be optional
-      posts: {pages: {}, pageCids: {}},
       // TODO: remove pubsubTopic should be optional
       pubsubTopic: subplebbitSigner.address,
     }
@@ -390,8 +387,7 @@ describe('protocol (node and browser)', () => {
 
     // validate challenge request pubsub message signature
     expect(challengeRequestPubsubMessage.signature.type).to.equal('ed25519')
-    // TODO: pubsub message signer should not be the publication signer or loss of anonymity
-    // expect(challengeRequestPubsubMessage.signature.publicKey).to.not.equal(authorSigner.publicKey)
+    expect(challengeRequestPubsubMessage.signature.publicKey).to.not.equal(authorSigner.publicKey)
     expect(challengeRequestPubsubMessage.signature.signedPropertyNames).to.include.members([
       'type',
       'challengeRequestId',
