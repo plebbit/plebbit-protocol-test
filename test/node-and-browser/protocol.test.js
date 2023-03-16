@@ -307,7 +307,7 @@ describe('protocol (node and browser)', () => {
     expect(subplebbitIpns.posts.pages.hot.comments.length).to.be.greaterThan(0)
     const pageComment = subplebbitIpns.posts.pages.hot.comments.filter((pageComment) => pageComment.comment.cid === publishedCommentCid)[0]
     if (!pageComment) {
-      throw Error('comment is not in first page, must restart test server')
+      throw Error('published comment is not in subplebbit first page, must restart test server')
     }
     expect(pageComment.comment.cid).to.equal(publishedCommentCid)
     for (const propertyName in comment) {
