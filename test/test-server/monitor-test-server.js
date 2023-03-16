@@ -11,29 +11,47 @@ const fetchText = async (url) => {
   return text
 }
 
-// log when the test server crashes
-setInterval(async () => {
-  const text = await fetchText('http://localhost:59281')
-  if (text === 'test server ready') {
+// make sure only one instance is running in node
+let started = false
+const startMonitoring = () => {
+  if (started) {
     return
   }
-  console.error('test server crashed http://localhost:59281')
-}, 200).unref?.()
+  started = true
 
-// log when ipfs crashes
-setInterval(async () => {
-  const text = await fetchText(`http://localhost:${offlineIpfs.gatewayPort}/ipfs/QmQPeNsJPyVWPFDVHb77w8G42Fvo15z4bG2X8D2GhfbSXc/readme`)
-  if (text && text.startsWith('Hello and Welcome to IPFS')) {
-    return
-  }
-  console.error(`test server offline ipfs daemon crashed http://localhost:${offlineIpfs.gatewayPort}`)
-}, 200).unref?.()
+  // log when the test server crashes
+  setInterval(async () => {
+    const text = await fetchText('http://localhost:59281')
+    if (text === 'test server ready') {
+      return
+    }
+    console.error('test server crashed http://localhost:59281')
+  }, 200).unref?.()
 
-// log when pubsub ipfs crashes
-setInterval(async () => {
-  const text = await fetchText(`http://localhost:${pubsubIpfs.gatewayPort}/ipfs/QmQPeNsJPyVWPFDVHb77w8G42Fvo15z4bG2X8D2GhfbSXc/readme`)
-  if (text && text.startsWith('Hello and Welcome to IPFS')) {
-    return
+  // log when ipfs crashes
+  setInterval(async () => {
+    const text = await fetchText(`http://localhost:${offlineIpfs.gatewayPort}/ipfs/QmQPeNsJPyVWPFDVHb77w8G42Fvo15z4bG2X8D2GhfbSXc/readme`)
+    if (text && text.startsWith('Hello and Welcome to IPFS')) {
+      return
+    }
+    console.error(`test server crashed offline ipfs daemon http://localhost:${offlineIpfs.gatewayPort}`)
+  }, 200).unref?.()
+
+  // log when pubsub ipfs crashes
+  setInterval(async () => {
+    const text = await fetchText(`http://localhost:${pubsubIpfs.gatewayPort}/ipfs/QmQPeNsJPyVWPFDVHb77w8G42Fvo15z4bG2X8D2GhfbSXc/readme`)
+    if (text && text.startsWith('Hello and Welcome to IPFS')) {
+      return
+    }
+    console.error(`test server crashed pubsub ipfs daemon http://localhost:${offlineIpfs.gatewayPort}`)
+  }, 200).unref?.()
+}
+
+// make sure only one instance is running in karma
+try {
+  if (!window.PLEBBIT_PROTOCOL_TEST_MONITOR_TEST_SERVER_STARTED) {
+    startMonitoring()
   }
-  console.error(`test server pubsub ipfs daemon crashed http://localhost:${offlineIpfs.gatewayPort}`)
-}, 200).unref?.()
+  window.PLEBBIT_PROTOCOL_TEST_MONITOR_TEST_SERVER_STARTED = true
+} catch (e) {}
+startMonitoring()
