@@ -23,6 +23,7 @@ const ipfsClient = IpfsHttpClient.create({url: plebbitOptions.ipfsHttpClientOpti
 const signers = require('../fixtures/signers')
 let plebbit
 let publishedCommentCid
+let publishedCommentIpnsName
 
 describe('protocol (node and browser)', () => {
   before(async () => {
@@ -158,6 +159,7 @@ describe('protocol (node and browser)', () => {
     )
     console.log({publishedPublication})
     publishedCommentCid = publishedPublication.cid
+    publishedCommentIpnsName = publishedPublication.ipnsName
 
     // validate challenge verification pubsub message
     expect(publishedPublication.author.address).to.equal(comment.author.address)
@@ -220,6 +222,10 @@ describe('protocol (node and browser)', () => {
     expect(commentIpns.downvoteCount).to.equal(0)
     expect(commentIpns.replyCount).to.equal(0)
     expect(typeof commentIpns.updatedAt).to.equal('number')
+    expect(typeof commentIpns.author?.subplebbit?.firstCommentTimestamp).to.equal('number')
+    expect(typeof commentIpns.author?.subplebbit?.lastCommentCid).to.equal('string')
+    expect(typeof commentIpns.author?.subplebbit?.postScore).to.equal('number')
+    expect(typeof commentIpns.author?.subplebbit?.replyScore).to.equal('number')
 
     // validate comment ipns signature
     expect(commentIpns.signature.type).to.equal('ed25519')
@@ -285,6 +291,178 @@ describe('protocol (node and browser)', () => {
         publicKey: subplebbitSigner.publicKey,
       })
     ).to.equal(true)
+
+    // validate included posts
+    expect(subplebbitIpns.posts.pages.hot.comments.length).to.be.greaterThan(0)
+    expect(subplebbitIpns.posts.pages.hot.comments[0].comment.cid).to.equal(publishedCommentCid)
+    for (const propertyName in comment) {
+      expect(subplebbitIpns.posts.pages.hot.comments[0].comment[propertyName]).to.deep.equal(comment[propertyName])
+    }
+    expect(subplebbitIpns.posts.pages.hot.comments[0].commentUpdate.cid).to.equal(publishedCommentCid)
+    expect(typeof subplebbitIpns.posts.pages.hot.comments[0].commentUpdate.updatedAt).to.equal('number')
+    expect(subplebbitIpns.posts.pages.hot.comments[0].commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+
+    // fetch page ipfs
+    expect(typeof subplebbitIpns.posts.pageCids.new).to.equal('string')
+    const pageIpfs = await fetchJson(`${ipfsGatewayUrl}/ipfs/${subplebbitIpns.posts.pageCids.new}`)
+    console.log({pageIpfs})
+
+    // validate page ipfs
+    expect(pageIpfs.comments.length).to.be.greaterThan(0)
+    expect(pageIpfs.comments[0].comment.cid).to.equal(publishedCommentCid)
+    for (const propertyName in comment) {
+      expect(pageIpfs.comments[0].comment[propertyName]).to.deep.equal(comment[propertyName])
+    }
+    expect(pageIpfs.comments[0].commentUpdate.cid).to.equal(publishedCommentCid)
+    expect(typeof pageIpfs.comments[0].commentUpdate.updatedAt).to.equal('number')
+    expect(pageIpfs.comments[0].commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+  })
+
+  it('create reply and publish over pubsub', async () => {
+    const subplebbitSigner = signers[0]
+    const authorSigner = signers[5]
+    const pubsubMessageSigner = signers[6]
+
+    // create reply
+    const reply = {
+      parentCid: publishedCommentCid,
+      subplebbitAddress: subplebbitSigner.address,
+      timestamp: Math.round(Date.now() / 1000),
+      protocolVersion: '1.0.0',
+      content: 'reply content',
+      author: {address: authorSigner.address},
+    }
+
+    // create reply signature
+    // signed prop names can be in any order
+    const replySignedPropertyNames = shuffleArray(['subplebbitAddress', 'author', 'timestamp', 'content', 'title', 'link', 'parentCid'])
+    const replySignature = await sign({
+      objectToSign: reply,
+      signedPropertyNames: replySignedPropertyNames,
+      privateKey: authorSigner.privateKey,
+    })
+    reply.signature = {
+      signature: replySignature,
+      publicKey: authorSigner.publicKey,
+      type: 'ed25519',
+      signedPropertyNames: replySignedPropertyNames,
+    }
+    console.log({reply})
+
+    // encrypt publication
+    const encryptedPublication = await encryptEd25519AesGcm(JSON.stringify(reply), pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
+
+    // create pubsub challenge request message
+    const challengeRequestPubsubMessage = {
+      type: 'CHALLENGEREQUEST',
+      timestamp: Math.round(Date.now() / 1000),
+      challengeRequestId: getRandomString(),
+      acceptedChallengeTypes: ['image/png'],
+      encryptedPublication: encryptedPublication,
+      protocolVersion: '1.0.0',
+      userAgent: `/protocol-test:1.0.0/`,
+    }
+
+    // create pubsub challenge request message signature
+    const challengeRequestPubsubMessageSignedPropertyNames = shuffleArray(['type', 'timestamp', 'challengeRequestId', 'encryptedPublication', 'acceptedChallengeTypes'])
+    const challengeRequestPubsubMessageSignature = await sign({
+      objectToSign: challengeRequestPubsubMessage,
+      signedPropertyNames: challengeRequestPubsubMessageSignedPropertyNames,
+      privateKey: pubsubMessageSigner.privateKey,
+    })
+    challengeRequestPubsubMessage.signature = {
+      signature: challengeRequestPubsubMessageSignature,
+      publicKey: pubsubMessageSigner.publicKey,
+      type: 'ed25519',
+      signedPropertyNames: challengeRequestPubsubMessageSignedPropertyNames,
+    }
+    console.log({challengeRequestPubsubMessage})
+
+    // publish pubsub challenge request message
+    const challengePubsubMessage = await publishPubsubMessage(subplebbitSigner.address, challengeRequestPubsubMessage)
+    console.log({challengePubsubMessage})
+
+    // decrypt challenges
+    const challenges = JSON.parse(await decryptEd25519AesGcm(challengePubsubMessage.encryptedChallenges, pubsubMessageSigner.privateKey, subplebbitSigner.publicKey))
+    console.log({challenges})
+
+    // create pubsub challenge answer message
+    const challengeAnswers = ['2']
+    const encryptedChallengeAnswers = await encryptEd25519AesGcm(JSON.stringify(challengeAnswers), pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
+    const challengeAnswerPubsubMessage = {
+      type: 'CHALLENGEANSWER',
+      timestamp: Math.round(Date.now() / 1000),
+      challengeAnswerId: getRandomString(),
+      challengeRequestId: challengeRequestPubsubMessage.challengeRequestId,
+      encryptedChallengeAnswers,
+      protocolVersion: '1.0.0',
+      userAgent: `/protocol-test:1.0.0/`,
+    }
+
+    // create pubsub challenge answer message signature
+    const challengeAnswerPubsubMessageSignedPropertyNames = shuffleArray(['type', 'timestamp', 'challengeRequestId', 'challengeAnswerId', 'encryptedChallengeAnswers'])
+    const challengeAnswerPubsubMessageSignature = await sign({
+      objectToSign: challengeAnswerPubsubMessage,
+      signedPropertyNames: challengeAnswerPubsubMessageSignedPropertyNames,
+      privateKey: pubsubMessageSigner.privateKey,
+    })
+    challengeAnswerPubsubMessage.signature = {
+      signature: challengeAnswerPubsubMessageSignature,
+      publicKey: pubsubMessageSigner.publicKey,
+      type: 'ed25519',
+      signedPropertyNames: challengeAnswerPubsubMessageSignedPropertyNames,
+    }
+    console.log({challengeAnswerPubsubMessage})
+
+    // publish pubsub challenge answer message
+    const challengeVerificationPubsubMessage = await publishPubsubMessage(subplebbitSigner.address, challengeAnswerPubsubMessage)
+    console.log({challengeVerificationPubsubMessage})
+
+    // decrypt challenge verification publication
+    const publishedPublication = JSON.parse(
+      await decryptEd25519AesGcm(challengeVerificationPubsubMessage.encryptedPublication, pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
+    )
+    console.log({publishedPublication})
+    const replyCid = publishedPublication.cid
+
+    // fetch parent comment ipns until it has reply
+    let parentCommentIpns
+    while (true) {
+      parentCommentIpns = await fetchJson(`${ipfsGatewayUrl}/ipns/${publishedCommentIpnsName}`)
+      if (parentCommentIpns?.replyCount > 0) {
+        break
+      }
+    }
+    console.log({parentCommentIpns})
+
+    // validate parent comment ipns
+    expect(parentCommentIpns.replyCount).to.equal(1)
+    expect(typeof parentCommentIpns.updatedAt).to.equal('number')
+
+    // validate included replies
+    expect(parentCommentIpns.replies.pages.topAll.comments.length).to.equal(1)
+    expect(parentCommentIpns.replies.pages.topAll.comments[0].comment.cid).to.equal(replyCid)
+    for (const propertyName in reply) {
+      expect(parentCommentIpns.replies.pages.topAll.comments[0].comment[propertyName]).to.deep.equal(reply[propertyName])
+    }
+    expect(parentCommentIpns.replies.pages.topAll.comments[0].commentUpdate.cid).to.equal(replyCid)
+    expect(typeof parentCommentIpns.replies.pages.topAll.comments[0].commentUpdate.updatedAt).to.equal('number')
+    expect(parentCommentIpns.replies.pages.topAll.comments[0].commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+
+    // fetch replies page ipfs
+    expect(typeof parentCommentIpns.replies.pageCids.new).to.equal('string')
+    const repliesPageIpfs = await fetchJson(`${ipfsGatewayUrl}/ipfs/${parentCommentIpns.replies.pageCids.new}`)
+    console.log({repliesPageIpfs})
+
+    // validate replies page ipfs
+    expect(repliesPageIpfs.comments.length).to.equal(1)
+    expect(repliesPageIpfs.comments[0].comment.cid).to.equal(replyCid)
+    for (const propertyName in reply) {
+      expect(repliesPageIpfs.comments[0].comment[propertyName]).to.deep.equal(reply[propertyName])
+    }
+    expect(repliesPageIpfs.comments[0].commentUpdate.cid).to.equal(replyCid)
+    expect(typeof repliesPageIpfs.comments[0].commentUpdate.updatedAt).to.equal('number')
+    expect(repliesPageIpfs.comments[0].commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
   })
 
   it('create subplebbit and listen over pubsub', async () => {
@@ -609,8 +787,6 @@ describe('protocol (node and browser)', () => {
     })
     comment.update().catch(console.error)
     const updatedComment = await commentUpdatePromise
-
-    console.log('after update')
 
     comment.stop()
     console.log({updatedComment})
