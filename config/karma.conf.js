@@ -42,7 +42,11 @@ if (process.env.HEADLESS) {
 // add firefox during CI
 // make sure non-headless DebugChrome is not included as it breaks the CI
 if (process.env.CI) {
-  browsers = ['CustomChrome', 'FirefoxHeadless']
+  browsers = [
+    'CustomChrome',
+    // don't use firefox because the CI is flaky with it and it's not needed
+    // 'FirefoxHeadless'
+  ]
 }
 
 // inject browser code before each test file
