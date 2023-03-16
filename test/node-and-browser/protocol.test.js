@@ -10,6 +10,7 @@ try {
   require('util').inspect.defaultOptions.depth = null
 } catch (e) {}
 
+require('../test-server/monitor-test-server')
 const chai = require('chai')
 const {expect} = chai
 chai.use(require('chai-string'))
