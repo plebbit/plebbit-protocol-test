@@ -5,7 +5,11 @@ try {
   }
 } catch (e) {}
 
-require('util').inspect.defaultOptions.depth = null
+// log full objects in node
+try {
+  require('util').inspect.defaultOptions.depth = null
+} catch (e) {}
+
 const chai = require('chai')
 const {expect} = chai
 chai.use(require('chai-string'))
