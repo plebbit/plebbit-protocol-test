@@ -341,7 +341,7 @@ describe('protocol (node and browser)', function () {
     } else {
       // only throw in CI because in dev we need to retry a lot and pageComment won't be in first page
       if (isCI()) {
-        throw Error('published comment is not in subplebbit.posts.pages.hot, maybe test server must be restarted')
+        throw Error('published comment is not in subplebbit.posts.pages.hot, maybe too many test comments were published and test server must be restarted')
       }
     }
 
