@@ -33,13 +33,18 @@ console.log({plebbitOptions, ipfsGatewayUrl})
 const pubsubIpfsClient = IpfsHttpClient.create({url: plebbitOptions.pubsubHttpClientOptions})
 const ipfsClient = IpfsHttpClient.create({url: plebbitOptions.ipfsHttpClientOptions})
 const signers = require('../fixtures/signers')
+const {isCI} = require('../utils/test-utils')
 let plebbit
 let publishedCommentCid
 let publishedCommentIpnsName
 
+// uncomment to test flakiness
+// let i = 100; while (--i)
 describe('protocol (node and browser)', function () {
-  // add retries because sometimes the CI is flaky
-  this.retries(3)
+  // retry because sometimes CI is flaky
+  // if (isCI()) {
+  //   this.retries(3)
+  // }
 
   before(async () => {
     plebbit = await Plebbit(plebbitOptions)
@@ -276,8 +281,17 @@ describe('protocol (node and browser)', function () {
       })
     ).to.equal(true)
 
-    // fetch subplebbit ipns
-    const subplebbitIpns = await fetchJson(`${ipfsGatewayUrl}/ipns/${subplebbitSigner.address}`)
+    // fetch subplebbit ipns until subplebbit.posts.pages.new have at least 1 comment
+    let subplebbitIpns
+    maxAttempts = 200
+    while (maxAttempts--) {
+      subplebbitIpns = await fetchJson(`${ipfsGatewayUrl}/ipns/${subplebbitSigner.address}`)
+      if (subplebbitIpns.posts?.pages?.hot?.comments?.length > 0) {
+        break
+      }
+      console.log(`subplebbit.posts.pages.new doesn't have at least 1 comment, retry fetching subplebbit...`)
+      await new Promise((r) => setTimeout(r, 100)) // sleep
+    }
     console.log({subplebbitIpns})
 
     // validate subplebbit ipns
@@ -316,20 +330,35 @@ describe('protocol (node and browser)', function () {
     // validate included posts
     expect(subplebbitIpns.posts.pages.hot.comments.length).to.be.greaterThan(0)
     const pageComment = subplebbitIpns.posts.pages.hot.comments.filter((pageComment) => pageComment.comment.cid === publishedCommentCid)[0]
-    if (!pageComment) {
-      throw Error('published comment is not in subplebbit first page, must restart test server')
+    if (pageComment) {
+      expect(pageComment.comment.cid).to.equal(publishedCommentCid)
+      for (const propertyName in comment) {
+        expect(pageComment.comment[propertyName]).to.deep.equal(comment[propertyName])
+      }
+      expect(pageComment.commentUpdate.cid).to.equal(publishedCommentCid)
+      expect(typeof pageComment.commentUpdate.updatedAt).to.equal('number')
+      expect(pageComment.commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+    } else {
+      // only throw in CI because in dev we need to retry a lot and pageComment won't be in first page
+      if (isCI()) {
+        throw Error('published comment is not in subplebbit.posts.pages.hot, maybe test server must be restarted')
+      }
     }
-    expect(pageComment.comment.cid).to.equal(publishedCommentCid)
-    for (const propertyName in comment) {
-      expect(pageComment.comment[propertyName]).to.deep.equal(comment[propertyName])
-    }
-    expect(pageComment.commentUpdate.cid).to.equal(publishedCommentCid)
-    expect(typeof pageComment.commentUpdate.updatedAt).to.equal('number')
-    expect(pageComment.commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
 
-    // fetch page ipfs
+    // fetch page ipfs until first comment of sort type new is published comment
     expect(typeof subplebbitIpns.posts.pageCids.new).to.equal('string')
-    const pageIpfs = await fetchJson(`${ipfsGatewayUrl}/ipfs/${subplebbitIpns.posts.pageCids.new}`)
+    let pageIpfs
+    maxAttempts = 200
+    while (maxAttempts--) {
+      pageIpfs = await fetchJson(`${ipfsGatewayUrl}/ipfs/${subplebbitIpns.posts.pageCids.new}`)
+      if (pageIpfs.comments[0]?.comment.cid === publishedCommentCid) {
+        break
+      }
+      console.log(`published comment isn't first in subplebbit page sort type 'new', retry fetching page...`)
+      await new Promise((r) => setTimeout(r, 100)) // sleep
+      // refetch the subplebbitIpns to get updated pageCid
+      subplebbitIpns = await fetchJson(`${ipfsGatewayUrl}/ipns/${subplebbitSigner.address}`)
+    }
     console.log({pageIpfs})
 
     // validate page ipfs
@@ -452,12 +481,13 @@ describe('protocol (node and browser)', function () {
 
     // fetch parent comment ipns until it has reply
     let parentCommentIpns
-    let maxAttempt = 50
-    while (maxAttempt--) {
+    let maxAttempts = 200
+    while (maxAttempts--) {
       parentCommentIpns = await fetchJson(`${ipfsGatewayUrl}/ipns/${publishedCommentIpnsName}`)
       if (parentCommentIpns?.replyCount > 0) {
         break
       }
+      console.log(`parent commentIpns.replyCount isn't at least 1, retry fetching commentIpns...`)
       await new Promise((r) => setTimeout(r, 100)) // sleep
     }
     console.log({parentCommentIpns})

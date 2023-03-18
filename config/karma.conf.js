@@ -59,6 +59,13 @@ if (process.env.DEBUG) {
     `
 }
 
+// some tests should only run in CI
+if (process.env.CI) {
+  codeToInjectBefore += `
+      window.PLEBBIT_PROTOCOL_TEST_CI = true;
+    `
+}
+
 const files = [
   // the tests are first compiled from typescript to dist/node/test
   // then they are compiled to browser with webpack to dist/browser/test
