@@ -335,9 +335,9 @@ describe('protocol (node and browser)', function () {
       for (const propertyName in comment) {
         expect(pageComment.comment[propertyName]).to.deep.equal(comment[propertyName])
       }
-      expect(pageComment.commentUpdate.cid).to.equal(publishedCommentCid)
-      expect(typeof pageComment.commentUpdate.updatedAt).to.equal('number')
-      expect(pageComment.commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+      expect(pageComment.update.cid).to.equal(publishedCommentCid)
+      expect(typeof pageComment.update.updatedAt).to.equal('number')
+      expect(pageComment.update.signature.publicKey).to.equal(subplebbitSigner.publicKey)
     } else {
       // only throw in CI because in dev we need to retry a lot and pageComment won't be in first page
       if (isCI()) {
@@ -367,9 +367,9 @@ describe('protocol (node and browser)', function () {
     for (const propertyName in comment) {
       expect(pageIpfs.comments[0].comment[propertyName]).to.deep.equal(comment[propertyName])
     }
-    expect(pageIpfs.comments[0].commentUpdate.cid).to.equal(publishedCommentCid)
-    expect(typeof pageIpfs.comments[0].commentUpdate.updatedAt).to.equal('number')
-    expect(pageIpfs.comments[0].commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+    expect(pageIpfs.comments[0].update.cid).to.equal(publishedCommentCid)
+    expect(typeof pageIpfs.comments[0].update.updatedAt).to.equal('number')
+    expect(pageIpfs.comments[0].update.signature.publicKey).to.equal(subplebbitSigner.publicKey)
   })
 
   it('create reply and publish over pubsub', async () => {
@@ -503,9 +503,9 @@ describe('protocol (node and browser)', function () {
     for (const propertyName in reply) {
       expect(parentCommentIpns.replies.pages.topAll.comments[0].comment[propertyName]).to.deep.equal(reply[propertyName])
     }
-    expect(parentCommentIpns.replies.pages.topAll.comments[0].commentUpdate.cid).to.equal(replyCid)
-    expect(typeof parentCommentIpns.replies.pages.topAll.comments[0].commentUpdate.updatedAt).to.equal('number')
-    expect(parentCommentIpns.replies.pages.topAll.comments[0].commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+    expect(parentCommentIpns.replies.pages.topAll.comments[0].update.cid).to.equal(replyCid)
+    expect(typeof parentCommentIpns.replies.pages.topAll.comments[0].update.updatedAt).to.equal('number')
+    expect(parentCommentIpns.replies.pages.topAll.comments[0].update.signature.publicKey).to.equal(subplebbitSigner.publicKey)
 
     // fetch replies page ipfs
     expect(typeof parentCommentIpns.replies.pageCids.new).to.equal('string')
@@ -518,9 +518,9 @@ describe('protocol (node and browser)', function () {
     for (const propertyName in reply) {
       expect(repliesPageIpfs.comments[0].comment[propertyName]).to.deep.equal(reply[propertyName])
     }
-    expect(repliesPageIpfs.comments[0].commentUpdate.cid).to.equal(replyCid)
-    expect(typeof repliesPageIpfs.comments[0].commentUpdate.updatedAt).to.equal('number')
-    expect(repliesPageIpfs.comments[0].commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+    expect(repliesPageIpfs.comments[0].update.cid).to.equal(replyCid)
+    expect(typeof repliesPageIpfs.comments[0].update.updatedAt).to.equal('number')
+    expect(repliesPageIpfs.comments[0].update.signature.publicKey).to.equal(subplebbitSigner.publicKey)
   })
 
   it('create subplebbit and listen over pubsub', async () => {
