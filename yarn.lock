@@ -1488,9 +1488,9 @@
     mkdirp "^1.0.4"
     rimraf "^3.0.2"
 
-"@plebbit/plebbit-js@https://github.com/plebbit/plebbit-js.git#8d32e7d53ec328b2fc0b533864d888856892e936":
+"@plebbit/plebbit-js@https://github.com/plebbit/plebbit-js.git#f1279f55558db3cdf0459be786217b9bfe845194":
   version "0.0.3"
-  resolved "https://github.com/plebbit/plebbit-js.git#8d32e7d53ec328b2fc0b533864d888856892e936"
+  resolved "https://github.com/plebbit/plebbit-js.git#f1279f55558db3cdf0459be786217b9bfe845194"
   dependencies:
     "@keyv/sqlite" "3.6.2"
     "@plebbit/plebbit-logger" "github:plebbit/plebbit-logger"
@@ -1515,10 +1515,11 @@
     libp2p-crypto "0.21.2"
     lodash-es "4.17.21"
     peer-id "0.16.0"
-    proper-lockfile "github:Rinse12/node-proper-lockfile"
+    proper-lockfile "github:plebbit/node-proper-lockfile"
     safe-stable-stringify "2.4.1"
     skia-canvas "1.0.0"
     sqlite3 "5.1.2"
+    tiny-typed-emitter "2.1.0"
     tinycache "1.1.2"
     uuid "9.0.0"
 
@@ -6171,9 +6172,9 @@ promise-retry@^2.0.1:
     err-code "^2.0.2"
     retry "^0.12.0"
 
-"proper-lockfile@github:Rinse12/node-proper-lockfile":
+"proper-lockfile@github:plebbit/node-proper-lockfile":
   version "4.1.2"
-  resolved "https://codeload.github.com/Rinse12/node-proper-lockfile/tar.gz/072ee9e37d52858cf8410ce55c281599cef1fb92"
+  resolved "https://codeload.github.com/plebbit/node-proper-lockfile/tar.gz/072ee9e37d52858cf8410ce55c281599cef1fb92"
   dependencies:
     graceful-fs "^4.2.4"
     retry "^0.12.0"
@@ -7182,6 +7183,11 @@ timeout-abort-controller@^3.0.0:
   integrity sha512-O3e+2B8BKrQxU2YRyEjC/2yFdb33slI22WRdUaDx6rvysfi9anloNZyR2q0l6LnePo5qH7gSM7uZtvvwZbc2yA==
   dependencies:
     retimer "^3.0.0"
+
+tiny-typed-emitter@2.1.0:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/tiny-typed-emitter/-/tiny-typed-emitter-2.1.0.tgz#b3b027fdd389ff81a152c8e847ee2f5be9fad7b5"
+  integrity sha512-qVtvMxeXbVej0cQWKqVSSAHmKZEHAvxdF8HEUBFWts8h+xEo5m/lEiPakuyZ3BnCBjOD8i24kzNOiOLLgsSxhA==
 
 tinycache@1.1.2:
   version "1.1.2"
