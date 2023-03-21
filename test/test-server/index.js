@@ -40,18 +40,9 @@ const privateKey = signers[0].privateKey
   plebbit2.on('error', console.log)
   const signer = await plebbit.createSigner({privateKey, type: 'ed25519'})
 
-  const dbConfig = {
-    client: 'sqlite3',
-    connection: {
-      filename: ':memory:',
-    },
-    useNullAsDefault: true,
-  }
-
   console.log(`creating subplebbit with address '${signer.address}'...`)
   const subplebbit = await plebbit.createSubplebbit({
     signer,
-    database: dbConfig,
     title: 'subplebbit title',
   })
   subplebbit.on('challengerequest', console.log)
