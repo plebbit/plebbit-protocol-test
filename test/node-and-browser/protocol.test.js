@@ -1247,7 +1247,7 @@ const verify = async ({objectToSign, signedPropertyNames, signature, publicKey})
 
 const publishPubsubMessage = async (pubsubTopic, messageObject) => {
   let onMessageReceived
-  messageReceivedPromise = new Promise((resolve) => {
+  const messageReceivedPromise = new Promise((resolve) => {
     onMessageReceived = async (rawMessageReceived) => {
       const messageReceivedString = uint8ArrayToString(rawMessageReceived.data)
       // console.log('message received', messageReceivedString)
