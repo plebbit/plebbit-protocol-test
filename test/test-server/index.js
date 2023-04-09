@@ -18,8 +18,8 @@ const privateKey = signers[0].privateKey
   await startIpfs(pubsubIpfs)
 
   const plebbitOptions = {
-    ipfsHttpClientOptions: `http://localhost:${offlineIpfs.apiPort}/api/v0`,
-    pubsubHttpClientOptions: `http://localhost:${pubsubIpfs.apiPort}/api/v0`,
+    ipfsHttpClientsOptions: [`http://localhost:${offlineIpfs.apiPort}/api/v0`],
+    pubsubHttpClientsOptions: [`http://localhost:${pubsubIpfs.apiPort}/api/v0`],
     // pubsubHttpClientOptions: `https://pubsubprovider.xyz/api/v0`,
     dataPath: plebbitDataPath,
   }
@@ -30,7 +30,7 @@ const privateKey = signers[0].privateKey
       // use the signer address as the key name to use in the tests
       keyName: signer.address,
       privateKey: signer.privateKey,
-      ipfsHttpUrl: plebbitOptions.ipfsHttpClientOptions,
+      ipfsHttpUrl: plebbitOptions.ipfsHttpClientsOptions[0],
     })
   }
 

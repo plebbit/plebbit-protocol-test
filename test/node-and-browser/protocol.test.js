@@ -25,13 +25,13 @@ const {toString: uint8ArrayToString} = require('uint8arrays/to-string')
 const {signBufferEd25519, verifyBufferEd25519} = require('../utils/signature')
 const {offlineIpfs, pubsubIpfs} = require('../test-server/ipfs-config')
 const plebbitOptions = {
-  ipfsHttpClientOptions: `http://localhost:${offlineIpfs.apiPort}/api/v0`,
-  pubsubHttpClientOptions: `http://localhost:${pubsubIpfs.apiPort}/api/v0`,
+  ipfsHttpClientsOptions: [`http://localhost:${offlineIpfs.apiPort}/api/v0`],
+  pubsubHttpClientsOptions: [`http://localhost:${pubsubIpfs.apiPort}/api/v0`],
 }
 const ipfsGatewayUrl = `http://localhost:${offlineIpfs.gatewayPort}`
 console.log({plebbitOptions, ipfsGatewayUrl})
-const pubsubIpfsClient = IpfsHttpClient.create({url: plebbitOptions.pubsubHttpClientOptions})
-const ipfsClient = IpfsHttpClient.create({url: plebbitOptions.ipfsHttpClientOptions})
+const pubsubIpfsClient = IpfsHttpClient.create({url: plebbitOptions.pubsubHttpClientsOptions[0]})
+const ipfsClient = IpfsHttpClient.create({url: plebbitOptions.ipfsHttpsClientOptions[0]})
 const signers = require('../fixtures/signers')
 const {isCI} = require('../utils/test-utils')
 let plebbit
