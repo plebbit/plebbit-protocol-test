@@ -31,7 +31,7 @@ const plebbitOptions = {
 const ipfsGatewayUrl = `http://localhost:${offlineIpfs.gatewayPort}`
 console.log({plebbitOptions, ipfsGatewayUrl})
 const pubsubIpfsClient = IpfsHttpClient.create({url: plebbitOptions.pubsubHttpClientsOptions[0]})
-const ipfsClient = IpfsHttpClient.create({url: plebbitOptions.ipfsHttpsClientOptions[0]})
+const ipfsClient = IpfsHttpClient.create({url: plebbitOptions.ipfsHttpClientsOptions[0]})
 const signers = require('../fixtures/signers')
 const {isCI} = require('../utils/test-utils')
 let plebbit
