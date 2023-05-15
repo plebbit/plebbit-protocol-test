@@ -22,6 +22,8 @@ const privateKey = signers[0].privateKey
     pubsubHttpClientsOptions: [`http://localhost:${pubsubIpfs.apiPort}/api/v0`],
     // pubsubHttpClientOptions: `https://pubsubprovider.xyz/api/v0`,
     dataPath: plebbitDataPath,
+    publishInterval: 1000,
+    updateInterval: 1000,
     noData: true,
   }
 
@@ -59,7 +61,6 @@ const privateKey = signers[0].privateKey
   console.log('subplebbit created')
 
   console.log('starting subplebbit...')
-  subplebbit._syncIntervalMs = 500
   await subplebbit.start()
   subplebbit.once('update', async () => {
     console.log(`subplebbit started with address ${signer.address}`)
