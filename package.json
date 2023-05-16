@@ -15,7 +15,7 @@
     "@babel/core": "7.20.2",
     "@babel/plugin-transform-runtime": "7.19.6",
     "@babel/preset-env": "7.20.2",
-    "@plebbit/plebbit-js": "https://github.com/plebbit/plebbit-js.git#a339e33ac79019cc923d61ace03a26ddb3a0094f",
+    "@plebbit/plebbit-js": "https://github.com/plebbit/plebbit-js.git#2e33610eeb278f35ce841e2c9a38fbc224e1ace2",
     "babel-loader": "9.1.0",
     "cborg": "1.9.6",
     "chai": "4.3.6",
