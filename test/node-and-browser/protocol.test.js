@@ -34,6 +34,7 @@ const pubsubIpfsClient = IpfsHttpClient.create({url: plebbitOptions.pubsubHttpCl
 const ipfsClient = IpfsHttpClient.create({url: plebbitOptions.ipfsHttpClientsOptions[0]})
 const signers = require('../fixtures/signers')
 const {isCI} = require('../utils/test-utils')
+const {encode, decode} = require('cborg')
 let plebbit
 let publishedCommentCid
 let publishedCommentIpnsName
@@ -1249,9 +1250,8 @@ const publishPubsubMessage = async (pubsubTopic, messageObject) => {
   let onMessageReceived
   const messageReceivedPromise = new Promise((resolve) => {
     onMessageReceived = async (rawMessageReceived) => {
-      const messageReceivedString = uint8ArrayToString(rawMessageReceived.data)
       // console.log('message received', messageReceivedString)
-      const messageReceivedObject = JSON.parse(messageReceivedString)
+      const messageReceivedObject = decode(rawMessageReceived.data)
 
       // not the message we're looking for
       if (messageObject.challengeRequestId !== messageReceivedObject.challengeRequestId) {
@@ -1279,7 +1279,7 @@ const publishPubsubMessage = async (pubsubTopic, messageObject) => {
   await pubsubIpfsClient.pubsub.subscribe(pubsubTopic, onMessageReceived)
   console.log('subscribed to:', pubsubTopic)
 
-  const message = uint8ArrayFromString(JSON.stringify(messageObject))
+  const message = encode(messageObject)
   await pubsubIpfsClient.pubsub.publish(pubsubTopic, message)
   console.log('published message:', messageObject.type)
 
@@ -1298,10 +1298,9 @@ const pubsubSubscribe = async (pubsubTopic) => {
   const onMessageReceived = async (rawMessageReceived) => {
     await sleep(100) // need to sleep or doesn't work for some reason
 
-    const messageReceivedString = uint8ArrayToString(rawMessageReceived.data)
     // console.log('message received', messageReceivedString)
 
-    const messageReceivedObject = JSON.parse(messageReceivedString)
+    const messageReceivedObject = decode(rawMessageReceived.data)
     if (messageReceivedObject.type === 'CHALLENGEREQUEST' || messageReceivedObject.type === 'CHALLENGEANSWER') {
       getMessageResolve(messageReceivedObject)
     }
