@@ -24,6 +24,7 @@ const privateKey = signers[0].privateKey
     dataPath: plebbitDataPath,
     publishInterval: 1000,
     updateInterval: 1000,
+    noData: true,
   }
 
   // import all keys to ipfs here because the import key api is buggy
@@ -60,7 +61,6 @@ const privateKey = signers[0].privateKey
   console.log('subplebbit created')
 
   console.log('starting subplebbit...')
-  subplebbit._syncIntervalMs = 500
   await subplebbit.start()
   subplebbit.once('update', async () => {
     console.log(`subplebbit started with address ${signer.address}`)
