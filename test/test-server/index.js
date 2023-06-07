@@ -22,6 +22,8 @@ const privateKey = signers[0].privateKey
     pubsubHttpClientsOptions: [`http://localhost:${pubsubIpfs.apiPort}/api/v0`],
     // pubsubHttpClientOptions: `https://pubsubprovider.xyz/api/v0`,
     dataPath: plebbitDataPath,
+    publishInterval: 1000,
+    updateInterval: 1000,
   }
 
   // import all keys to ipfs here because the import key api is buggy

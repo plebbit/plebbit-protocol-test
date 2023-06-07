@@ -86,18 +86,16 @@ const encryptEd25519AesGcm = async (plaintext, privateKeyBase64, publicKeyBase64
   const {ciphertext, iv, tag} = await encryptStringAesGcm(plaintext + padding, aesGcmKey16Bytes)
 
   const encryptedBase64 = {
-    ciphertext: uint8ArrayToString(ciphertext, 'base64'),
-    iv: uint8ArrayToString(iv, 'base64'),
+    ciphertext,
+    iv,
     // AES-GCM has authentication tag https://en.wikipedia.org/wiki/Galois/Counter_Mode
-    tag: uint8ArrayToString(tag, 'base64'),
+    tag,
     type: 'ed25519-aes-gcm',
   }
   return encryptedBase64
 }
 
 const decryptEd25519AesGcm = async (encrypted, privateKeyBase64, publicKeyBase64) => {
-  if (!encrypted?.ciphertext || typeof encrypted?.ciphertext !== 'string') throw Error(`decryptEd25519AesGcm encrypted.ciphertext '${encrypted.ciphertext}' not a string`)
-  const ciphertextBuffer = uint8ArrayFromString(encrypted.ciphertext, 'base64')
   if (!privateKeyBase64 || typeof privateKeyBase64 !== 'string') throw Error(`decryptEd25519AesGcm ${privateKeyBase64} privateKeyBase64 not a string`)
   const privateKeyBuffer = uint8ArrayFromString(privateKeyBase64, 'base64')
   if (privateKeyBuffer.length !== 32) throw Error(`decryptEd25519AesGcm publicKeyBase64 ed25519 public key length not 32 bytes (${privateKeyBuffer.length} bytes)`)
@@ -105,10 +103,6 @@ const decryptEd25519AesGcm = async (encrypted, privateKeyBase64, publicKeyBase64
   const publicKeyBuffer = uint8ArrayFromString(publicKeyBase64, 'base64')
   if (publicKeyBuffer.length !== 32)
     throw Error(`decryptEd25519AesGcm publicKeyBase64 '${publicKeyBase64}' ed25519 public key length not 32 bytes (${publicKeyBuffer.length} bytes)`)
-  if (!encrypted?.iv || typeof encrypted?.iv !== 'string') throw Error(`decryptEd25519AesGcm encrypted.iv '${encrypted.iv}' not a string`)
-  const ivBuffer = uint8ArrayFromString(encrypted.iv, 'base64')
-  if (!encrypted?.tag || typeof encrypted?.tag !== 'string') throw Error(`decryptEd25519AesGcm encrypted.tag '${encrypted.tag}' not a string`)
-  const tagBuffer = uint8ArrayFromString(encrypted.tag, 'base64')
 
   // compute the shared secret of the sender and recipient and use it as the encryption key
   // do not publish this secret https://datatracker.ietf.org/doc/html/rfc7748#section-6.1
@@ -117,7 +111,7 @@ const decryptEd25519AesGcm = async (encrypted, privateKeyBase64, publicKeyBase64
   const aesGcmKey16Bytes = aesGcmKey.slice(0, 16)
 
   // AES GCM using 128-bit key https://en.wikipedia.org/wiki/Galois/Counter_Mode
-  let decrypted = await decryptStringAesGcm(ciphertextBuffer, aesGcmKey16Bytes, ivBuffer, tagBuffer)
+  let decrypted = await decryptStringAesGcm(encrypted.ciphertext, aesGcmKey16Bytes, encrypted.iv, encrypted.tag)
 
   // remove padding
   decrypted = decrypted.replace(/ *$/, '')
