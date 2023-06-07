@@ -61,7 +61,7 @@ describe('protocol (node and browser)', function () {
   })
 
   // publishedCommentCid is defined in this test, add .only if needed
-  it.only('create comment and publish over pubsub', async () => {
+  it('create comment and publish over pubsub', async () => {
     const subplebbitSigner = signers[0]
     const authorSigner = signers[1]
     const pubsubMessageSigner = await generateSigner()
@@ -1005,7 +1005,7 @@ describe('protocol (node and browser)', function () {
     ).to.equal(true)
   })
 
-  it.only('create author comment edit and publish over pubsub', async () => {
+  it('create author comment edit and publish over pubsub', async () => {
     const subplebbitSigner = signers[0]
     const authorSigner = signers[1]
     const pubsubMessageSigner = await generateSigner()
