@@ -880,8 +880,8 @@ describe('protocol (node and browser)', function () {
       privateKey: authorSigner.privateKey,
     })
     vote.signature = {
-      signature: uint8ArrayFromString(voteSignature, 'base64'),
-      publicKey: uint8ArrayFromString(authorSigner.publicKey, 'base64'),
+      signature: voteSignature,
+      publicKey: authorSigner.publicKey,
       type: 'ed25519',
       signedPropertyNames: voteSignedPropertyNames,
     }
@@ -933,7 +933,7 @@ describe('protocol (node and browser)', function () {
 
     // validate challenge pubsub message subplebbit owner signature
     expect(challengePubsubMessage.signature.type).to.equal('ed25519')
-    expect(challengePubsubMessage.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+    expect(uint8ArrayToString(challengePubsubMessage.signature.publicKey, 'base64')).to.equal(subplebbitSigner.publicKey)
     expect(challengePubsubMessage.signature.signedPropertyNames).to.include.members(['type', 'timestamp', 'challengeRequestId', 'encryptedChallenges'])
     expect(
       await verify({
@@ -964,8 +964,8 @@ describe('protocol (node and browser)', function () {
       privateKey: pubsubMessageSigner.privateKey,
     })
     challengeAnswerPubsubMessage.signature = {
-      signature: challengeAnswerPubsubMessageSignature,
-      publicKey: pubsubMessageSigner.publicKey,
+      signature: uint8ArrayFromString(challengeAnswerPubsubMessageSignature, 'base64'),
+      publicKey: uint8ArrayFromString(pubsubMessageSigner.publicKey, 'base64'),
       type: 'ed25519',
       signedPropertyNames: challengeAnswerPubsubMessageSignedPropertyNames,
     }
@@ -1046,8 +1046,8 @@ describe('protocol (node and browser)', function () {
       privateKey: authorSigner.privateKey,
     })
     commentEdit.signature = {
-      signature: uint8ArrayFromString(commentEditSignature, 'base64'),
-      publicKey: uint8ArrayFromString(authorSigner.publicKey, 'base64'),
+      signature: commentEditSignature,
+      publicKey: authorSigner.publicKey,
       type: 'ed25519',
       signedPropertyNames: commentEditSignedPropertyNames,
     }
@@ -1130,8 +1130,8 @@ describe('protocol (node and browser)', function () {
       privateKey: pubsubMessageSigner.privateKey,
     })
     challengeAnswerPubsubMessage.signature = {
-      signature: challengeAnswerPubsubMessageSignature,
-      publicKey: pubsubMessageSigner.publicKey,
+      signature: uint8ArrayFromString(challengeAnswerPubsubMessageSignature, 'base64'),
+      publicKey: uint8ArrayFromString(pubsubMessageSigner.publicKey, 'base64'),
       type: 'ed25519',
       signedPropertyNames: challengeAnswerPubsubMessageSignedPropertyNames,
     }
@@ -1151,7 +1151,7 @@ describe('protocol (node and browser)', function () {
 
     // validate challenge verification pubsub message subplebbit owner signature
     expect(challengeVerificationPubsubMessage.signature.type).to.equal('ed25519')
-    expect(challengeVerificationPubsubMessage.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+    expect(uint8ArrayToString(challengeVerificationPubsubMessage.signature.publicKey, 'base64')).to.equal(subplebbitSigner.publicKey)
     expect(challengeVerificationPubsubMessage.signature.signedPropertyNames).to.include.members([
       'type',
       'timestamp',
