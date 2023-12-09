@@ -54,7 +54,9 @@ describe('protocol (node and browser)', function () {
     plebbit = await Plebbit(plebbitOptions)
     plebbit.on('error', console.error)
   })
-  after(async () => {})
+  after(async () => {
+    await plebbit.destroy()
+  })
 
   beforeEach(async () => {
     await assertTestServerDidntCrash()
