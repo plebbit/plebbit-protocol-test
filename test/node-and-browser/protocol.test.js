@@ -31,13 +31,16 @@ const plebbitOptions = {
 }
 const ipfsGatewayUrl = `http://localhost:${offlineIpfs.gatewayPort}`
 console.log({plebbitOptions, ipfsGatewayUrl})
-const pubsubIpfsClient = IpfsHttpClient.create({url: plebbitOptions.pubsubHttpClientsOptions[0]})
-const ipfsClient = IpfsHttpClient.create({url: plebbitOptions.ipfsHttpClientsOptions[0]})
+const pubsubIpfsClient = IpfsHttpClient.create({
+  url: plebbitOptions.pubsubHttpClientsOptions[0],
+})
+const ipfsClient = IpfsHttpClient.create({
+  url: plebbitOptions.ipfsHttpClientsOptions[0],
+})
 const signers = require('../fixtures/signers')
 const {isCI} = require('../utils/test-utils')
 let plebbit
 let publishedCommentCid
-let publishedCommentIpnsName
 
 // uncomment to test flakiness
 // let i = 100; while (--i)
@@ -186,7 +189,6 @@ describe('protocol (node and browser)', function () {
     ).publication
     console.log({publishedPublication})
     publishedCommentCid = publishedPublication.cid
-    publishedCommentIpnsName = publishedPublication.ipnsName
 
     // validate challenge verification pubsub message
     expect(publishedPublication.author.address).to.equal(comment.author.address)
@@ -197,7 +199,6 @@ describe('protocol (node and browser)', function () {
     expect(publishedPublication.subplebbitAddress).to.equal(comment.subplebbitAddress)
     expect(publishedPublication.signature).to.deep.equal(comment.signature)
     expect(publishedPublication.cid).to.startWith('Qm')
-    expect(publishedPublication.ipnsName).to.startWith('12D3KooW')
     expect(challengeVerificationPubsubMessage.type).to.equal('CHALLENGEVERIFICATION')
     expect(challengeVerificationPubsubMessage.encrypted.type).to.equal('ed25519-aes-gcm')
     expect(challengeVerificationPubsubMessage.challengeSuccess).to.equal(true)
@@ -237,26 +238,28 @@ describe('protocol (node and browser)', function () {
     expect(commentIpfs.subplebbitAddress).to.equal(publishedPublication.subplebbitAddress)
     expect(commentIpfs.signature).to.deep.equal(publishedPublication.signature)
     expect(commentIpfs.cid).to.equal(undefined)
-    expect(commentIpfs.ipnsName).to.equal(publishedPublication.ipnsName)
 
-    // fetch comment ipns
-    const commentIpns = await fetchJson(`${ipfsGatewayUrl}/ipns/${commentIpfs.ipnsName}`)
-    console.log({commentIpns})
+    // fetch commentUpdate
+    // Should we add a timeout here?
+    await sleep(3000)
+    const subplebbitIpfs = await fetchJson(`${ipfsGatewayUrl}/ipns/${commentIpfs.subplebbitAddress}`)
+    const commentUpdate = await fetchJson(`${ipfsGatewayUrl}/ipfs/${subplebbitIpfs.postUpdates['86400']}/${publishedPublication.cid}/update`)
+    console.log({commentUpdate})
 
     // validate comment ipns
-    expect(commentIpns.upvoteCount).to.equal(0)
-    expect(commentIpns.downvoteCount).to.equal(0)
-    expect(commentIpns.replyCount).to.equal(0)
-    expect(typeof commentIpns.updatedAt).to.equal('number')
-    expect(typeof commentIpns.author?.subplebbit?.firstCommentTimestamp).to.equal('number')
-    expect(typeof commentIpns.author?.subplebbit?.lastCommentCid).to.equal('string')
-    expect(typeof commentIpns.author?.subplebbit?.postScore).to.equal('number')
-    expect(typeof commentIpns.author?.subplebbit?.replyScore).to.equal('number')
+    expect(commentUpdate.upvoteCount).to.equal(0)
+    expect(commentUpdate.downvoteCount).to.equal(0)
+    expect(commentUpdate.replyCount).to.equal(0)
+    expect(typeof commentUpdate.updatedAt).to.equal('number')
+    expect(typeof commentUpdate.author?.subplebbit?.firstCommentTimestamp).to.equal('number')
+    expect(typeof commentUpdate.author?.subplebbit?.lastCommentCid).to.equal('string')
+    expect(typeof commentUpdate.author?.subplebbit?.postScore).to.equal('number')
+    expect(typeof commentUpdate.author?.subplebbit?.replyScore).to.equal('number')
 
     // validate comment ipns signature
-    expect(commentIpns.signature.type).to.equal('ed25519')
-    expect(commentIpns.signature.publicKey).to.equal(subplebbitSigner.publicKey)
-    expect(commentIpns.signature.signedPropertyNames).to.include.members([
+    expect(commentUpdate.signature.type).to.equal('ed25519')
+    expect(commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+    expect(commentUpdate.signature.signedPropertyNames).to.include.members([
       'edit',
       'upvoteCount',
       'downvoteCount',
@@ -273,9 +276,9 @@ describe('protocol (node and browser)', function () {
     ])
     expect(
       await verify({
-        objectToSign: commentIpns,
-        signedPropertyNames: commentIpns.signature.signedPropertyNames,
-        signature: commentIpns.signature.signature,
+        objectToSign: commentUpdate,
+        signedPropertyNames: commentUpdate.signature.signedPropertyNames,
+        signature: commentUpdate.signature.signature,
         publicKey: subplebbitSigner.publicKey,
       })
     ).to.equal(true)
@@ -477,37 +480,39 @@ describe('protocol (node and browser)', function () {
     console.log({publishedPublication})
     const replyCid = publishedPublication.cid
 
-    // fetch parent comment ipns until it has reply
-    let parentCommentIpns
+    // fetch parent comment update until it has reply
+    let parentCommentUpdate
     let maxAttempts = 200
+    await sleep(3000)
     while (maxAttempts--) {
-      parentCommentIpns = await fetchJson(`${ipfsGatewayUrl}/ipns/${publishedCommentIpnsName}`)
-      if (parentCommentIpns?.replyCount > 0) {
+      const subplebbitIpfs = await fetchJson(`${ipfsGatewayUrl}/ipns/${publishedPublication.subplebbitAddress}`)
+      parentCommentUpdate = await fetchJson(`${ipfsGatewayUrl}/ipfs/${subplebbitIpfs.postUpdates['86400']}/${publishedPublication.parentCid}/update`)
+      if (parentCommentUpdate?.replyCount > 0) {
         break
       }
-      console.log(`parent commentIpns.replyCount isn't at least 1, retry fetching commentIpns...`)
+      console.log(`parent commentUpdate.replyCount isn't at least 1, retry fetching CommentUpdate...`)
       await new Promise((r) => setTimeout(r, 100)) // sleep
     }
-    console.log({parentCommentIpns})
+    console.log({parentCommentUpdate})
 
-    // validate parent comment ipns
-    expect(parentCommentIpns).to.not.equal(undefined)
-    expect(parentCommentIpns.replyCount).to.equal(1)
-    expect(typeof parentCommentIpns.updatedAt).to.equal('number')
+    // validate parent comment update
+    expect(parentCommentUpdate).to.not.equal(undefined)
+    expect(parentCommentUpdate.replyCount).to.equal(1)
+    expect(typeof parentCommentUpdate.updatedAt).to.equal('number')
 
     // validate included replies
-    expect(parentCommentIpns.replies.pages.topAll.comments.length).to.equal(1)
-    expect(parentCommentIpns.replies.pages.topAll.comments[0].comment.cid).to.equal(replyCid)
+    expect(parentCommentUpdate.replies.pages.topAll.comments.length).to.equal(1)
+    expect(parentCommentUpdate.replies.pages.topAll.comments[0].comment.cid).to.equal(replyCid)
     for (const propertyName in reply) {
-      expect(parentCommentIpns.replies.pages.topAll.comments[0].comment[propertyName]).to.deep.equal(reply[propertyName])
+      expect(parentCommentUpdate.replies.pages.topAll.comments[0].comment[propertyName]).to.deep.equal(reply[propertyName])
     }
-    expect(parentCommentIpns.replies.pages.topAll.comments[0].update.cid).to.equal(replyCid)
-    expect(typeof parentCommentIpns.replies.pages.topAll.comments[0].update.updatedAt).to.equal('number')
-    expect(parentCommentIpns.replies.pages.topAll.comments[0].update.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+    expect(parentCommentUpdate.replies.pages.topAll.comments[0].update.cid).to.equal(replyCid)
+    expect(typeof parentCommentUpdate.replies.pages.topAll.comments[0].update.updatedAt).to.equal('number')
+    expect(parentCommentUpdate.replies.pages.topAll.comments[0].update.signature.publicKey).to.equal(subplebbitSigner.publicKey)
 
     // fetch replies page ipfs
-    expect(typeof parentCommentIpns.replies.pageCids.new).to.equal('string')
-    const repliesPageIpfs = await fetchJson(`${ipfsGatewayUrl}/ipfs/${parentCommentIpns.replies.pageCids.new}`)
+    expect(typeof parentCommentUpdate.replies.pageCids.new).to.equal('string')
+    const repliesPageIpfs = await fetchJson(`${ipfsGatewayUrl}/ipfs/${parentCommentUpdate.replies.pageCids.new}`)
     console.log({repliesPageIpfs})
 
     // validate replies page ipfs
@@ -525,7 +530,6 @@ describe('protocol (node and browser)', function () {
     // change the subplebbit signer to a sub that isn't running in the test server
     const subplebbitSigner = signers[1]
     const authorSigner = signers[0]
-    const commentIpnsSigner = signers[2]
 
     // create subplebbit ipns object
     const subplebbitIpns = {
@@ -561,6 +565,7 @@ describe('protocol (node and browser)', function () {
       'flairs',
       'protocolVersion',
       'encryption',
+      'postUpdates',
     ])
     const subplebbitIpnsSignature = await sign({
       objectToSign: subplebbitIpns,
@@ -584,7 +589,10 @@ describe('protocol (node and browser)', function () {
     })
 
     // listen for comment over p2p
-    const signer = await plebbit.createSigner({privateKey: authorSigner.privateKey, type: 'ed25519'})
+    const signer = await plebbit.createSigner({
+      privateKey: authorSigner.privateKey,
+      type: 'ed25519',
+    })
     const createCommentOptions = {
       subplebbitAddress: subplebbitSigner.address,
       signer,
@@ -730,7 +738,6 @@ describe('protocol (node and browser)', function () {
     const publicationIpfs = {
       ...challengeRequestPubsubMessage.publication,
       depth: 0,
-      ipnsName: commentIpnsSigner.address,
     }
     const publicationIpfsFile = await ipfsClient.add(JSON.stringify(subplebbitIpns))
     const publishedPublication = {
@@ -785,8 +792,8 @@ describe('protocol (node and browser)', function () {
     expect(challengeVerificationEvent.challengeSuccess).to.equal(true)
     expect(challengeVerificationEvent.publication).to.deep.equal(publishedPublication)
 
-    // create comment ipns object
-    const commentIpns = {
+    // create commentUpdate object
+    const commentUpdate = {
       cid: publishedPublication.cid,
       // TODO: author should be optional, needs to be fixed in plebbit-js
       author: {},
@@ -795,8 +802,8 @@ describe('protocol (node and browser)', function () {
       protocolVersion: '1.0.0',
     }
 
-    // create comment ipns signature
-    const commentIpnsSignedPropertyNames = shuffleArray([
+    // create comment update signature
+    const commentUpdateSignedPropertyNames = shuffleArray([
       'cid',
       'edit',
       'upvoteCount',
@@ -812,24 +819,48 @@ describe('protocol (node and browser)', function () {
       'updatedAt',
       'author',
     ])
-    const commentIpnsSignature = await sign({
-      objectToSign: commentIpns,
-      signedPropertyNames: commentIpnsSignedPropertyNames,
+    const commentUpdateSignature = await sign({
+      objectToSign: commentUpdate,
+      signedPropertyNames: commentUpdateSignedPropertyNames,
       privateKey: subplebbitSigner.privateKey,
     })
-    commentIpns.signature = {
-      signature: commentIpnsSignature,
+    commentUpdate.signature = {
+      signature: commentUpdateSignature,
       publicKey: subplebbitSigner.publicKey,
       type: 'ed25519',
-      signedPropertyNames: commentIpnsSignedPropertyNames,
+      signedPropertyNames: commentUpdateSignedPropertyNames,
     }
-    console.log({commentIpns})
+    console.log({commentUpdate})
 
     // publish ipns
-    const commentIpnsFile = await ipfsClient.add(JSON.stringify(commentIpns))
-    await ipfsClient.name.publish(commentIpnsFile.path, {
+
+    await ipfsClient.files.write(`/${subplebbitIpns.address}/postUpdates/86400/${publishedPublication.cid}/update`, JSON.stringify(commentUpdate), {
+      parents: true,
+      create: true,
+      truncate: true,
+    })
+
+    const statOfPostUpdatesDirectory = await ipfsClient.files.stat(`/${subplebbitIpns.address}/postUpdates/86400`)
+    subplebbitIpns.postUpdates = {'86400': String(statOfPostUpdatesDirectory.cid)}
+
+    const subplebbitIpnsSignatureNewUpdate = await sign({
+      objectToSign: subplebbitIpns,
+      signedPropertyNames: subplebbitIpnsSignedPropertyNames,
+      privateKey: subplebbitSigner.privateKey,
+    })
+    subplebbitIpns.signature = {
+      signature: subplebbitIpnsSignatureNewUpdate,
+      publicKey: subplebbitSigner.publicKey,
+      type: 'ed25519',
+      signedPropertyNames: subplebbitIpnsSignedPropertyNames,
+    }
+    console.log({subplebbitIpns})
+
+    // publish ipns
+    const subplebbitIpnsFile2 = await ipfsClient.add(JSON.stringify(subplebbitIpns))
+    await ipfsClient.name.publish(subplebbitIpnsFile2.path, {
       lifetime: '72h',
-      key: commentIpnsSigner.address, // ipfs key name imported in test server
+      key: subplebbitSigner.address, // ipfs key name imported in test server
       allowOffline: true,
     })
 
@@ -845,8 +876,8 @@ describe('protocol (node and browser)', function () {
 
     comment.stop()
     console.log({updatedComment})
-    expect(updatedComment.upvoteCount).to.equal(commentIpns.upvoteCount)
-    expect(updatedComment.downvoteCount).to.equal(commentIpns.downvoteCount)
+    expect(updatedComment.upvoteCount).to.equal(commentUpdate.upvoteCount)
+    expect(updatedComment.downvoteCount).to.equal(commentUpdate.downvoteCount)
     expect(typeof updatedComment.updatedAt).to.equal('number')
   })
 
@@ -1165,27 +1196,27 @@ describe('protocol (node and browser)', function () {
       })
     ).to.equal(true)
 
-    // fetch comment ipns
-    const commentIpfs = await fetchJson(`${ipfsGatewayUrl}/ipfs/${publishedCommentCid}`)
-    let commentIpns
+    // fetch commentUpdate
+    let commentUpdate
     // wait until latest author edit is published (multiple tests use the same comment)
-    while (!commentIpns?.edit || commentIpns.edit.timestamp !== commentEdit.timestamp) {
-      commentIpns = await fetchJson(`${ipfsGatewayUrl}/ipns/${commentIpfs.ipnsName}`)
+    while (!commentUpdate?.edit || commentUpdate.edit.timestamp !== commentEdit.timestamp) {
+      const subplebbitIpfs = await fetchJson(`${ipfsGatewayUrl}/ipns/${commentEdit.subplebbitAddress}`)
+      commentUpdate = await fetchJson(`${ipfsGatewayUrl}/ipfs/${subplebbitIpfs.postUpdates['86400']}/${commentEdit.commentCid}/update`)
     }
-    console.log({commentIpns})
+    console.log({commentUpdate})
 
     // validate author edit
-    expect(commentIpns.edit.author).to.deep.equal(commentEdit.author)
-    expect(commentIpns.edit.commentCid).to.equal(commentEdit.commentCid)
-    expect(commentIpns.edit.reason).to.equal(commentEdit.reason)
-    expect(commentIpns.edit.timestamp).to.equal(commentEdit.timestamp)
-    expect(commentIpns.edit.subplebbitAddress).to.equal(commentEdit.subplebbitAddress)
-    expect(commentIpns.edit.signature).to.deep.equal(commentEdit.signature)
+    expect(commentUpdate.edit.author).to.deep.equal(commentEdit.author)
+    expect(commentUpdate.edit.commentCid).to.equal(commentEdit.commentCid)
+    expect(commentUpdate.edit.reason).to.equal(commentEdit.reason)
+    expect(commentUpdate.edit.timestamp).to.equal(commentEdit.timestamp)
+    expect(commentUpdate.edit.subplebbitAddress).to.equal(commentEdit.subplebbitAddress)
+    expect(commentUpdate.edit.signature).to.deep.equal(commentEdit.signature)
 
     // validate author edit signature
-    expect(commentIpns.edit.signature.type).to.equal('ed25519')
-    expect(commentIpns.edit.signature.publicKey).to.equal(authorSigner.publicKey)
-    expect(commentIpns.edit.signature.signedPropertyNames).to.include.members([
+    expect(commentUpdate.edit.signature.type).to.equal('ed25519')
+    expect(commentUpdate.edit.signature.publicKey).to.equal(authorSigner.publicKey)
+    expect(commentUpdate.edit.signature.signedPropertyNames).to.include.members([
       'subplebbitAddress',
       'author',
       'timestamp',
@@ -1202,9 +1233,9 @@ describe('protocol (node and browser)', function () {
     ])
     expect(
       await verify({
-        objectToSign: commentIpns.edit,
-        signedPropertyNames: commentIpns.edit.signature.signedPropertyNames,
-        signature: commentIpns.edit.signature.signature,
+        objectToSign: commentUpdate.edit,
+        signedPropertyNames: commentUpdate.edit.signature.signedPropertyNames,
+        signature: commentUpdate.edit.signature.signature,
         publicKey: authorSigner.publicKey,
       })
     ).to.equal(true)
