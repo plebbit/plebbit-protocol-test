@@ -834,8 +834,7 @@ describe('protocol (node and browser)', function () {
     }
     console.log({commentUpdate})
 
-    // publish ipns
-
+    // publish post updates folder which contains the comment update
     await ipfsClient.files.write(`/${subplebbitIpns.address}/postUpdates/86400/${publishedPublication.cid}/update`, JSON.stringify(commentUpdate), {
       parents: true,
       create: true,
