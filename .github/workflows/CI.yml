@@ -32,8 +32,7 @@ jobs:
           - ubuntu-latest
           # - macOS-latest
         node_version:
-          # - 14
-          - 16
+          - 18
 
     steps:
       - run: sudo apt install -y xvfb
