@@ -70,4 +70,4 @@ signers[9] = {
   type: 'ed25519',
 }
 
-module.exports = signers
+export default signers

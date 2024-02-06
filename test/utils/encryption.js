@@ -1,7 +1,7 @@
-const ed = require('@noble/ed25519')
-const {fromString: uint8ArrayFromString} = require('uint8arrays/from-string')
-const {toString: uint8ArrayToString} = require('uint8arrays/to-string')
-const forge = require('node-forge')
+import * as ed from '@noble/ed25519'
+import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
+import {toString as uint8ArrayToString} from 'uint8arrays/to-string'
+import forge from 'node-forge'
 
 const isProbablyBuffer = (arg) => arg && typeof arg !== 'string' && typeof arg !== 'number'
 
@@ -59,7 +59,7 @@ const decryptStringAesGcm = async (ciphertext, key, iv, tag) => {
   return decrypted
 }
 
-const encryptEd25519AesGcm = async (plaintext, privateKeyBase64, publicKeyBase64) => {
+export const encryptEd25519AesGcm = async (plaintext, privateKeyBase64, publicKeyBase64) => {
   if (!plaintext || typeof plaintext !== 'string') throw Error(`encryptEd25519AesGcm plaintext '${plaintext}' not a string`)
   if (!privateKeyBase64 || typeof privateKeyBase64 !== 'string') throw Error(`encryptEd25519AesGcm privateKeyBase64 not a string`)
   const privateKeyBuffer = uint8ArrayFromString(privateKeyBase64, 'base64')
@@ -95,7 +95,7 @@ const encryptEd25519AesGcm = async (plaintext, privateKeyBase64, publicKeyBase64
   return encryptedBase64
 }
 
-const decryptEd25519AesGcm = async (encrypted, privateKeyBase64, publicKeyBase64) => {
+export const decryptEd25519AesGcm = async (encrypted, privateKeyBase64, publicKeyBase64) => {
   if (!privateKeyBase64 || typeof privateKeyBase64 !== 'string') throw Error(`decryptEd25519AesGcm ${privateKeyBase64} privateKeyBase64 not a string`)
   const privateKeyBuffer = uint8ArrayFromString(privateKeyBase64, 'base64')
   if (privateKeyBuffer.length !== 32) throw Error(`decryptEd25519AesGcm publicKeyBase64 ed25519 public key length not 32 bytes (${privateKeyBuffer.length} bytes)`)
@@ -118,5 +118,3 @@ const decryptEd25519AesGcm = async (encrypted, privateKeyBase64, publicKeyBase64
 
   return decrypted
 }
-
-module.exports = {encryptEd25519AesGcm, decryptEd25519AesGcm}

@@ -1,8 +1,6 @@
-const {getKeyPairFromPrivateKeyPem, getPeerIdFromPublicKeyPem} = require('./crypto')
-const assert = require('assert')
-const {fromString: uint8ArrayFromString} = require('uint8arrays/from-string')
-const {toString: uint8ArrayToString} = require('uint8arrays/to-string')
-const ed = require('@noble/ed25519')
+import assert from 'assert'
+import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
+import * as ed from '@noble/ed25519'
 
 const isProbablyBuffer = (arg) => arg && typeof arg !== 'string' && typeof arg !== 'number'
 
@@ -24,7 +22,7 @@ const verifyBufferEd25519 = async (bufferToSign, bufferSignature, publicKeyBase6
   assert.equal(
     publicKeyBuffer.length,
     32,
-    `verifyBufferEd25519 publicKeyBase64 '${publicKeyBase64}' ed25519 public key length not 32 bytes (${publicKeyBuffer.length} bytes)`
+    `verifyBufferEd25519 publicKeyBase64 '${publicKeyBase64}' ed25519 public key length not 32 bytes (${publicKeyBuffer.length} bytes)`,
   )
   const isValid = await ed.verify(bufferSignature, bufferToSign, publicKeyBuffer)
   return isValid
@@ -41,4 +39,4 @@ const getBufferToSign = (objectToSign, signedPropertyNames) => {
   return bufferToSign
 }
 
-module.exports = {signBufferEd25519, verifyBufferEd25519}
+export {signBufferEd25519, verifyBufferEd25519}

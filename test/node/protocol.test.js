@@ -1,12 +1,8 @@
-const Plebbit = require('@plebbit/plebbit-js')
+import Plebbit from '@plebbit/plebbit-js'
 
 // put node only tests here
 
 describe('protocol (node)', () => {
-  before(async () => {
-
-  })
-  after(async () => {
-
-  })
+  before(async () => {})
+  after(async () => {})
 })

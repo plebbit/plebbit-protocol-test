@@ -1,8 +1,7 @@
 // the test server can crash without logs, this script adds logs when this happens
 // you should also import assertTestServerDidntCrash and run it beforeEach and afterEach
 
-const fetch = require('node-fetch')
-const {offlineIpfs, pubsubIpfs} = require('./ipfs-config')
+import {offlineIpfs, pubsubIpfs} from './ipfs-config'
 
 // make sure only one instance is running in node
 let started = false
@@ -35,27 +34,28 @@ const logTestServerCrashed = async () => {
   }
 }
 
-const assertTestServerDidntCrash = async () => {
-  const testServerText = await fetchText('http://localhost:59281')
+export const assertTestServerDidntCrash = async () => {
+  const testServerText = await fetchText('http://127.0.0.1:59281')
   if (testServerText !== 'test server ready') {
-    throw Error('test server crashed http://localhost:59281')
+    throw Error('test server crashed http://127.0.0.1:59281')
   }
-  const offlineIpfsText = await fetchText(`http://localhost:${offlineIpfs.gatewayPort}/ipfs/QmQPeNsJPyVWPFDVHb77w8G42Fvo15z4bG2X8D2GhfbSXc/readme`)
+  const offlineIpfsText = await fetchText(`http://127.0.0.1:${offlineIpfs.gatewayPort}/ipfs/QmQPeNsJPyVWPFDVHb77w8G42Fvo15z4bG2X8D2GhfbSXc/readme`)
   if (!offlineIpfsText?.startsWith('Hello and Welcome to IPFS')) {
-    throw Error(`test server crashed offline ipfs daemon http://localhost:${offlineIpfs.gatewayPort}`)
+    throw Error(`test server crashed offline ipfs daemon http://127.0.0.1:${offlineIpfs.gatewayPort}`)
   }
-  const pubsubIpfsText = await fetchText(`http://localhost:${pubsubIpfs.gatewayPort}/ipfs/QmQPeNsJPyVWPFDVHb77w8G42Fvo15z4bG2X8D2GhfbSXc/readme`)
+  const pubsubIpfsText = await fetchText(`http://127.0.0.1:${pubsubIpfs.gatewayPort}/ipfs/QmQPeNsJPyVWPFDVHb77w8G42Fvo15z4bG2X8D2GhfbSXc/readme`)
   if (!pubsubIpfsText?.startsWith('Hello and Welcome to IPFS')) {
-    throw Error(`test server crashed pubsub ipfs daemon http://localhost:${pubsubIpfs.gatewayPort}`)
+    throw Error(`test server crashed pubsub ipfs daemon http://127.0.0.1:${pubsubIpfs.gatewayPort}`)
   }
 }
 
 const fetchText = async (url) => {
-  let text
   try {
-    text = await fetch(url, {cache: 'no-cache'}).then((res) => res.text())
-  } catch (e) {}
-  return text
+    const res = await fetch(url, {cache: 'no-cache'})
+    const resText = await res.text()
+    return resText
+  } catch (e) {
+    console.error(`Error for fetch url`, url, e)
+  }
+  return undefined
 }
-
-module.exports = {assertTestServerDidntCrash}

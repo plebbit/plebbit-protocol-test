@@ -1,9 +1,9 @@
-const ed = require('@noble/ed25519')
-const {fromString: uint8ArrayFromString} = require('uint8arrays/from-string')
-const {toString: uint8ArrayToString} = require('uint8arrays/to-string')
-const {Ed25519PublicKey, Ed25519PrivateKey} = require('libp2p-crypto/src/keys/ed25519-class')
-const assert = require('assert')
-const PeerId = require('peer-id')
+import * as ed from '@noble/ed25519'
+import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
+import {toString as uint8ArrayToString} from 'uint8arrays/to-string'
+import {Ed25519PublicKey, Ed25519PrivateKey} from 'libp2p-crypto/src/keys/ed25519-class'
+import assert from 'assert'
+import PeerId from 'peer-id'
 
 const generatePrivateKey = async () => {
   const privateKeyBuffer = ed.utils.randomPrivateKey()
@@ -48,7 +48,7 @@ const getPeerIdFromPublicKey = async (publicKeyBase64) => {
   assert.equal(
     publicKeyBuffer.length,
     32,
-    `getPeerIdFromPublicKey publicKeyBase64 '${publicKeyBase64}' ed25519 public key length not 32 bytes (${publicKeyBuffer.length} bytes)`
+    `getPeerIdFromPublicKey publicKeyBase64 '${publicKeyBase64}' ed25519 public key length not 32 bytes (${publicKeyBuffer.length} bytes)`,
   )
 
   // the PeerId public key is not a raw public key, it adds a suffix
@@ -82,7 +82,7 @@ const generateSigner = async () => {
   }
 }
 
-module.exports = {
+export {
   generatePrivateKey,
   getPublicKeyFromPrivateKey,
   getIpfsKeyFromPrivateKey,

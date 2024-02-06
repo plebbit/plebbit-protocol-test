@@ -1,4 +1,4 @@
-const isCI = () => {
+export const isCI = () => {
   let isCI = false
   try {
     if (window.PLEBBIT_PROTOCOL_TEST_CI) {
@@ -12,5 +12,3 @@ const isCI = () => {
   } catch (e) {}
   return isCI
 }
-
-module.exports = {isCI}

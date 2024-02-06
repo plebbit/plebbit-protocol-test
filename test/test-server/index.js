@@ -1,16 +1,17 @@
 // script to start IPFS and plebbit-js for testing
 
-require('util').inspect.defaultOptions.depth = null
-const Plebbit = require('@plebbit/plebbit-js')
-const getTmpFolderPath = require('tempy').directory
-const plebbitDataPath = getTmpFolderPath()
-const startIpfs = require('./start-ipfs')
-const {offlineIpfs, pubsubIpfs} = require('./ipfs-config')
-const signers = require('../fixtures/signers')
-const {ipfsKeyImport} = require('../utils/ipfs')
+;(await import('util')).inspect.defaultOptions.depth = null
+import Plebbit from '@plebbit/plebbit-js'
+import {directory as getTmpFolderPath} from 'tempy'
+import {startIpfs} from './start-ipfs'
+import {offlineIpfs, pubsubIpfs} from './ipfs-config'
+import signers from '../fixtures/signers'
+import {ipfsKeyImport} from '../utils/ipfs'
+import http from 'http'
 
 // always use the same private key and subplebbit address when testing
 const privateKey = signers[0].privateKey
+const plebbitDataPath = getTmpFolderPath()
 
 // set up a subplebbit for testing
 ;(async () => {
@@ -85,7 +86,7 @@ const privateKey = signers[0].privateKey
     // create a test server to be able to use npm module 'wait-on'
     // to know when the test server is finished getting ready
     // and able to start the automated tests
-    require('http')
+    http
       .createServer((req, res) => {
         res.setHeader('Access-Control-Allow-Origin', '*')
         res.end('test server ready')

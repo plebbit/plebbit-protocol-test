@@ -7,38 +7,38 @@ try {
 
 // log full objects in node
 try {
-  require('util').inspect.defaultOptions.depth = null
+  ;(await import('util')).inspect.defaultOptions.depth = null
 } catch (e) {}
 
-const {assertTestServerDidntCrash} = require('../test-server/monitor-test-server')
-const chai = require('chai')
+import {assertTestServerDidntCrash} from '../test-server/monitor-test-server'
+import chai from 'chai'
+import chaiString from 'chai-string'
 const {expect} = chai
-chai.use(require('chai-string'))
+chai.use(chaiString)
 
-const Plebbit = require('@plebbit/plebbit-js')
-const fetch = require('node-fetch')
-const cborg = require('cborg')
-const IpfsHttpClient = require('ipfs-http-client')
-const {encryptEd25519AesGcm, decryptEd25519AesGcm} = require('../utils/encryption')
-const {fromString: uint8ArrayFromString} = require('uint8arrays/from-string')
-const {toString: uint8ArrayToString} = require('uint8arrays/to-string')
-const {signBufferEd25519, verifyBufferEd25519} = require('../utils/signature')
-const {getChallengeRequestIdFromPublicKey, generateSigner} = require('../utils/crypto')
-const {offlineIpfs, pubsubIpfs} = require('../test-server/ipfs-config')
+import Plebbit from '@plebbit/plebbit-js'
+import * as cborg from 'cborg'
+import {create as CreateKuboRpcClient} from 'kubo-rpc-client'
+import {encryptEd25519AesGcm, decryptEd25519AesGcm} from '../utils/encryption'
+import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
+import {toString as uint8ArrayToString} from 'uint8arrays/to-string'
+import {signBufferEd25519, verifyBufferEd25519} from '../utils/signature'
+import {getChallengeRequestIdFromPublicKey, generateSigner} from '../utils/crypto'
+import {offlineIpfs, pubsubIpfs} from '../test-server/ipfs-config'
 const plebbitOptions = {
   ipfsHttpClientsOptions: [`http://localhost:${offlineIpfs.apiPort}/api/v0`],
   pubsubHttpClientsOptions: [`http://localhost:${pubsubIpfs.apiPort}/api/v0`],
 }
 const ipfsGatewayUrl = `http://localhost:${offlineIpfs.gatewayPort}`
 console.log({plebbitOptions, ipfsGatewayUrl})
-const pubsubIpfsClient = IpfsHttpClient.create({
+const pubsubIpfsClient = CreateKuboRpcClient({
   url: plebbitOptions.pubsubHttpClientsOptions[0],
 })
-const ipfsClient = IpfsHttpClient.create({
+const ipfsClient = CreateKuboRpcClient({
   url: plebbitOptions.ipfsHttpClientsOptions[0],
 })
-const signers = require('../fixtures/signers')
-const {isCI} = require('../utils/test-utils')
+import signers from '../fixtures/signers'
+import {isCI} from '../utils/test-utils'
 let plebbit
 let publishedCommentCid
 
@@ -151,7 +151,7 @@ describe('protocol (node and browser)', function () {
         signedPropertyNames: challengePubsubMessage.signature.signedPropertyNames,
         signature: uint8ArrayToString(challengePubsubMessage.signature.signature, 'base64'),
         publicKey: subplebbitSigner.publicKey,
-      })
+      }),
     ).to.equal(true)
 
     // create pubsub challenge answer message
@@ -187,7 +187,7 @@ describe('protocol (node and browser)', function () {
 
     // decrypt challenge verification publication
     const publishedPublication = JSON.parse(
-      await decryptEd25519AesGcm(challengeVerificationPubsubMessage.encrypted, pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
+      await decryptEd25519AesGcm(challengeVerificationPubsubMessage.encrypted, pubsubMessageSigner.privateKey, subplebbitSigner.publicKey),
     ).publication
     console.log({publishedPublication})
     publishedCommentCid = publishedPublication.cid
@@ -224,7 +224,7 @@ describe('protocol (node and browser)', function () {
         signedPropertyNames: challengeVerificationPubsubMessage.signature.signedPropertyNames,
         signature: uint8ArrayToString(challengeVerificationPubsubMessage.signature.signature, 'base64'),
         publicKey: subplebbitSigner.publicKey,
-      })
+      }),
     ).to.equal(true)
 
     // fetch published comment with ipfs
@@ -282,12 +282,12 @@ describe('protocol (node and browser)', function () {
         signedPropertyNames: commentUpdate.signature.signedPropertyNames,
         signature: commentUpdate.signature.signature,
         publicKey: subplebbitSigner.publicKey,
-      })
+      }),
     ).to.equal(true)
 
     // fetch subplebbit ipns until subplebbit.posts.pages.new have at least 1 comment
     let subplebbitIpns
-    maxAttempts = 200
+    let maxAttempts = 200
     while (maxAttempts--) {
       subplebbitIpns = await fetchJson(`${ipfsGatewayUrl}/ipns/${subplebbitSigner.address}`)
       if (subplebbitIpns.posts?.pages?.hot?.comments?.length > 0) {
@@ -328,7 +328,7 @@ describe('protocol (node and browser)', function () {
         signedPropertyNames: subplebbitIpns.signature.signedPropertyNames,
         signature: subplebbitIpns.signature.signature,
         publicKey: subplebbitSigner.publicKey,
-      })
+      }),
     ).to.equal(true)
 
     // validate included posts
@@ -477,7 +477,7 @@ describe('protocol (node and browser)', function () {
 
     // decrypt challenge verification publication
     const publishedPublication = JSON.parse(
-      await decryptEd25519AesGcm(challengeVerificationPubsubMessage.encrypted, pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
+      await decryptEd25519AesGcm(challengeVerificationPubsubMessage.encrypted, pubsubMessageSigner.privateKey, subplebbitSigner.publicKey),
     ).publication
     console.log({publishedPublication})
     const replyCid = publishedPublication.cid
@@ -622,8 +622,8 @@ describe('protocol (node and browser)', function () {
       await decryptEd25519AesGcm(
         challengeRequestPubsubMessage.encrypted,
         subplebbitSigner.privateKey,
-        uint8ArrayToString(challengeRequestPubsubMessage.signature.publicKey, 'base64')
-      )
+        uint8ArrayToString(challengeRequestPubsubMessage.signature.publicKey, 'base64'),
+      ),
     ).publication
     console.log({challengeRequestPubsubMessage})
 
@@ -643,7 +643,7 @@ describe('protocol (node and browser)', function () {
         signature: uint8ArrayToString(challengeRequestPubsubMessage.signature.signature, 'base64'),
         // use a random new public key, which must be the same with all future same challengeRequestId
         publicKey: uint8ArrayToString(challengeRequestPubsubMessage.signature.publicKey, 'base64'),
-      })
+      }),
     ).to.equal(true)
 
     // validate publication and publication signature
@@ -668,7 +668,7 @@ describe('protocol (node and browser)', function () {
         signedPropertyNames: challengeRequestPubsubMessage.publication.signature.signedPropertyNames,
         signature: challengeRequestPubsubMessage.publication.signature.signature,
         publicKey: authorSigner.publicKey,
-      })
+      }),
     ).to.equal(true)
 
     // create challenge pusub message
@@ -676,7 +676,7 @@ describe('protocol (node and browser)', function () {
     const encryptedChallenges = await encryptEd25519AesGcm(
       JSON.stringify({challenges}),
       subplebbitSigner.privateKey,
-      uint8ArrayToString(challengeRequestPubsubMessage.signature.publicKey, 'base64')
+      uint8ArrayToString(challengeRequestPubsubMessage.signature.publicKey, 'base64'),
     )
     const challengePubsubMessage = {
       type: 'CHALLENGE',
@@ -710,8 +710,8 @@ describe('protocol (node and browser)', function () {
       await decryptEd25519AesGcm(
         challengeAnswerPubsubMessage.encrypted,
         subplebbitSigner.privateKey,
-        uint8ArrayToString(challengeRequestPubsubMessage.signature.publicKey, 'base64')
-      )
+        uint8ArrayToString(challengeRequestPubsubMessage.signature.publicKey, 'base64'),
+      ),
     ).challengeAnswers
     console.log({challengeAnswerPubsubMessage})
 
@@ -733,7 +733,7 @@ describe('protocol (node and browser)', function () {
         signedPropertyNames: challengeAnswerPubsubMessage.signature.signedPropertyNames,
         signature: uint8ArrayToString(challengeAnswerPubsubMessage.signature.signature, 'base64'),
         publicKey: uint8ArrayToString(challengeAnswerPubsubMessage.signature.publicKey, 'base64'),
-      })
+      }),
     ).to.equal(true)
 
     // create encrypted publication
@@ -750,7 +750,7 @@ describe('protocol (node and browser)', function () {
     const encryptedPublishedPublication = await encryptEd25519AesGcm(
       JSON.stringify({publication: publishedPublication}),
       subplebbitSigner.privateKey,
-      uint8ArrayToString(challengeRequestPubsubMessage.signature.publicKey, 'base64')
+      uint8ArrayToString(challengeRequestPubsubMessage.signature.publicKey, 'base64'),
     )
 
     // create challenge verification pubsub message
@@ -968,7 +968,7 @@ describe('protocol (node and browser)', function () {
         signedPropertyNames: challengePubsubMessage.signature.signedPropertyNames,
         signature: uint8ArrayToString(challengePubsubMessage.signature.signature, 'base64'),
         publicKey: subplebbitSigner.publicKey,
-      })
+      }),
     ).to.equal(true)
 
     // create pubsub challenge answer message
@@ -1028,7 +1028,7 @@ describe('protocol (node and browser)', function () {
         signedPropertyNames: challengeVerificationPubsubMessage.signature.signedPropertyNames,
         signature: uint8ArrayToString(challengeVerificationPubsubMessage.signature.signature, 'base64'),
         publicKey: subplebbitSigner.publicKey,
-      })
+      }),
     ).to.equal(true)
   })
 
@@ -1134,7 +1134,7 @@ describe('protocol (node and browser)', function () {
         signedPropertyNames: challengePubsubMessage.signature.signedPropertyNames,
         signature: uint8ArrayToString(challengePubsubMessage.signature.signature, 'base64'),
         publicKey: subplebbitSigner.publicKey,
-      })
+      }),
     ).to.equal(true)
 
     // create pubsub challenge answer message
@@ -1194,7 +1194,7 @@ describe('protocol (node and browser)', function () {
         signedPropertyNames: challengeVerificationPubsubMessage.signature.signedPropertyNames,
         signature: uint8ArrayToString(challengeVerificationPubsubMessage.signature.signature, 'base64'),
         publicKey: subplebbitSigner.publicKey,
-      })
+      }),
     ).to.equal(true)
 
     // fetch commentUpdate
@@ -1238,7 +1238,7 @@ describe('protocol (node and browser)', function () {
         signedPropertyNames: commentUpdate.edit.signature.signedPropertyNames,
         signature: commentUpdate.edit.signature.signature,
         publicKey: authorSigner.publicKey,
-      })
+      }),
     ).to.equal(true)
   })
 
