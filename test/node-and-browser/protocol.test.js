@@ -16,7 +16,7 @@ import chaiString from 'chai-string'
 const {expect} = chai
 chai.use(chaiString)
 
-import Plebbit from '@plebbit/plebbit-js'
+import Plebbit from '@plebbit/plebbit-js/dist/node/index'
 import * as cborg from 'cborg'
 import {create as CreateKuboRpcClient} from 'kubo-rpc-client'
 import {encryptEd25519AesGcm, decryptEd25519AesGcm} from '../utils/encryption'
