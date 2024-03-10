@@ -25,7 +25,6 @@ const plebbitDataPath = getTmpFolderPath()
     dataPath: plebbitDataPath,
     publishInterval: 1000,
     updateInterval: 1000,
-    noData: true,
   }
 
   // import all keys to ipfs here because the import key api is buggy
