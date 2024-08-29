@@ -787,9 +787,9 @@ describe('protocol (node and browser)', function () {
     // create commentUpdate object
     const commentUpdate = {
       cid: publishedPublication.cid,
-      // TODO: author should be optional, needs to be fixed in plebbit-js
-      author: {},
       upvoteCount: 0,
+      downvoteCount: 0,
+      replyCount: 0,
       updatedAt: Math.round(Date.now() / 1000),
       protocolVersion: '1.0.0',
     }
