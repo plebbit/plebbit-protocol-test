@@ -844,9 +844,11 @@ describe('protocol (node and browser)', function () {
     const commentUpdatePromise = new Promise((resolve) => {
       comment.on('update', (updatedComment) => {
         console.log('update event')
-        resolve(updatedComment)
+        // It may emit an update event for CommentIpfs, we need to wait for CommentUpdate
+        if (updatedComment.updatedAt) resolve(updatedComment)
       })
     })
+    comment.on('error', console.error)
     comment.update().catch(console.error)
     const updatedComment = await commentUpdatePromise
 
