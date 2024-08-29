@@ -773,7 +773,7 @@ describe('protocol (node and browser)', function () {
     }
     console.log({challengeVerificationPubsubMessage})
 
-    process.on('unhandledRejection', console.error)
+    if (process) process.on('unhandledRejection', console.error)
     // publish challenge verification pubsub message
     await publishPubsubMessage(subplebbitSigner.address, challengeVerificationPubsubMessage)
     const challengeVerificationEvent = await challengeVerificationPromise
