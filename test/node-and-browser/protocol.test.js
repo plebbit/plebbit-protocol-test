@@ -83,7 +83,7 @@ describe('protocol (node and browser)', function () {
 
     // create comment signature
     // signed prop names can be in any order
-    const commentSignedPropertyNames = shuffleArray(['subplebbitAddress', 'author', 'timestamp', 'content', 'title', 'link', 'parentCid'])
+    const commentSignedPropertyNames = shuffleArray(Object.keys(comment))
     const commentSignature = await sign({
       objectToSign: comment,
       signedPropertyNames: commentSignedPropertyNames,
@@ -112,7 +112,7 @@ describe('protocol (node and browser)', function () {
     }
 
     // create pubsub challenge request message signature
-    const challengeRequestPubsubMessageSignedPropertyNames = shuffleArray(['type', 'timestamp', 'challengeRequestId', 'encrypted', 'acceptedChallengeTypes'])
+    const challengeRequestPubsubMessageSignedPropertyNames = shuffleArray(Object.keys(challengeRequestPubsubMessage))
     const challengeRequestPubsubMessageSignature = await sign({
       objectToSign: challengeRequestPubsubMessage,
       signedPropertyNames: challengeRequestPubsubMessageSignedPropertyNames,
@@ -167,7 +167,7 @@ describe('protocol (node and browser)', function () {
     }
 
     // create pubsub challenge answer message signature
-    const challengeAnswerPubsubMessageSignedPropertyNames = shuffleArray(['type', 'timestamp', 'challengeRequestId', 'encrypted'])
+    const challengeAnswerPubsubMessageSignedPropertyNames = shuffleArray(Object.keys(challengeAnswerPubsubMessage))
     const challengeAnswerPubsubMessageSignature = await sign({
       objectToSign: challengeAnswerPubsubMessage,
       signedPropertyNames: challengeAnswerPubsubMessageSignedPropertyNames,
@@ -393,7 +393,7 @@ describe('protocol (node and browser)', function () {
 
     // create reply signature
     // signed prop names can be in any order
-    const replySignedPropertyNames = shuffleArray(['subplebbitAddress', 'author', 'timestamp', 'content', 'title', 'link', 'parentCid'])
+    const replySignedPropertyNames = shuffleArray(Object.keys(reply))
     const replySignature = await sign({
       objectToSign: reply,
       signedPropertyNames: replySignedPropertyNames,
@@ -422,7 +422,7 @@ describe('protocol (node and browser)', function () {
     }
 
     // create pubsub challenge request message signature
-    const challengeRequestPubsubMessageSignedPropertyNames = shuffleArray(['type', 'timestamp', 'challengeRequestId', 'encrypted', 'acceptedChallengeTypes'])
+    const challengeRequestPubsubMessageSignedPropertyNames = shuffleArray(Object.keys(challengeRequestPubsubMessage))
     const challengeRequestPubsubMessageSignature = await sign({
       objectToSign: challengeRequestPubsubMessage,
       signedPropertyNames: challengeRequestPubsubMessageSignedPropertyNames,
@@ -457,7 +457,7 @@ describe('protocol (node and browser)', function () {
     }
 
     // create pubsub challenge answer message signature
-    const challengeAnswerPubsubMessageSignedPropertyNames = shuffleArray(['type', 'timestamp', 'challengeRequestId', 'encrypted'])
+    const challengeAnswerPubsubMessageSignedPropertyNames = shuffleArray(Object.keys(challengeAnswerPubsubMessage))
     const challengeAnswerPubsubMessageSignature = await sign({
       objectToSign: challengeAnswerPubsubMessage,
       signedPropertyNames: challengeAnswerPubsubMessageSignedPropertyNames,
@@ -540,6 +540,8 @@ describe('protocol (node and browser)', function () {
       description: 'description',
       createdAt: Math.round(Date.now() / 1000),
       updatedAt: Math.round(Date.now() / 1000),
+      statsCid: 'QmU1HXq547gXM5DpZMJubKFRKGET4MZUr5xmJj6ceASB1T',
+      challenges: [],
       protocolVersion: '1.0.0',
       encryption: {
         type: 'ed25519-aes-gcm',
@@ -550,25 +552,7 @@ describe('protocol (node and browser)', function () {
     }
 
     // create subplebbit ipns signature
-    const subplebbitIpnsSignedPropertyNames = shuffleArray([
-      'address',
-      'title',
-      'description',
-      'roles',
-      'pubsubTopic',
-      'lastPostCid',
-      'posts',
-      'challenges',
-      'createdAt',
-      'updatedAt',
-      'features',
-      'suggested',
-      'rules',
-      'flairs',
-      'protocolVersion',
-      'encryption',
-      'postUpdates',
-    ])
+    const subplebbitIpnsSignedPropertyNames = shuffleArray(Object.keys(subplebbitIpns))
     const subplebbitIpnsSignature = await sign({
       objectToSign: subplebbitIpns,
       signedPropertyNames: subplebbitIpnsSignedPropertyNames,
@@ -688,7 +672,7 @@ describe('protocol (node and browser)', function () {
     }
 
     // create pubsub challenge message signature
-    const challengePubsubMessageSignedPropertyNames = shuffleArray(['type', 'timestamp', 'challengeRequestId', 'encrypted'])
+    const challengePubsubMessageSignedPropertyNames = shuffleArray(Object.keys(challengePubsubMessage))
     const challengePubsubMessageSignature = await sign({
       objectToSign: challengePubsubMessage,
       signedPropertyNames: challengePubsubMessageSignedPropertyNames,
@@ -741,10 +725,11 @@ describe('protocol (node and browser)', function () {
       ...challengeRequestPubsubMessage.publication,
       depth: 0,
     }
-    const publicationIpfsFile = await ipfsClient.add(JSON.stringify(subplebbitIpns))
+    const publicationIpfsFile = await ipfsClient.add(JSON.stringify(publicationIpfs))
     const publishedPublication = {
       ...publicationIpfs,
       cid: publicationIpfsFile.path,
+      postCid: publicationIpfsFile.path,
     }
     console.log({publishedPublication})
     const encryptedPublishedPublication = await encryptEd25519AesGcm(
@@ -767,7 +752,10 @@ describe('protocol (node and browser)', function () {
       'type',
       'challengeRequestId',
       'challengeSuccess',
+      'timestamp',
       'encrypted',
+      'protocolVersion',
+      'userAgent',
       'challengeErrors',
       'reason',
     ])
@@ -784,6 +772,7 @@ describe('protocol (node and browser)', function () {
     }
     console.log({challengeVerificationPubsubMessage})
 
+    process.on('unhandledRejection', console.error)
     // publish challenge verification pubsub message
     await publishPubsubMessage(subplebbitSigner.address, challengeVerificationPubsubMessage)
     const challengeVerificationEvent = await challengeVerificationPromise
@@ -805,22 +794,7 @@ describe('protocol (node and browser)', function () {
     }
 
     // create comment update signature
-    const commentUpdateSignedPropertyNames = shuffleArray([
-      'cid',
-      'edit',
-      'upvoteCount',
-      'downvoteCount',
-      'replies',
-      'replyCount',
-      'flair',
-      'spoiler',
-      'pinned',
-      'locked',
-      'removed',
-      'reason',
-      'updatedAt',
-      'author',
-    ])
+    const commentUpdateSignedPropertyNames = shuffleArray(Object.keys(commentUpdate))
     const commentUpdateSignature = await sign({
       objectToSign: commentUpdate,
       signedPropertyNames: commentUpdateSignedPropertyNames,
@@ -900,7 +874,7 @@ describe('protocol (node and browser)', function () {
     }
 
     // create vote signature
-    const voteSignedPropertyNames = shuffleArray(['subplebbitAddress', 'author', 'timestamp', 'vote', 'commentCid'])
+    const voteSignedPropertyNames = shuffleArray(Object.keys(vote))
     const voteSignature = await sign({
       objectToSign: vote,
       signedPropertyNames: voteSignedPropertyNames,
@@ -929,7 +903,7 @@ describe('protocol (node and browser)', function () {
     }
 
     // create pubsub challenge request message signature
-    const challengeRequestPubsubMessageSignedPropertyNames = shuffleArray(['type', 'timestamp', 'challengeRequestId', 'encrypted', 'acceptedChallengeTypes'])
+    const challengeRequestPubsubMessageSignedPropertyNames = shuffleArray(Object.keys(challengeRequestPubsubMessage))
     const challengeRequestPubsubMessageSignature = await sign({
       objectToSign: challengeRequestPubsubMessage,
       signedPropertyNames: challengeRequestPubsubMessageSignedPropertyNames,
@@ -984,7 +958,7 @@ describe('protocol (node and browser)', function () {
     }
 
     // create pubsub challenge answer message signature
-    const challengeAnswerPubsubMessageSignedPropertyNames = shuffleArray(['type', 'timestamp', 'challengeRequestId', 'encrypted'])
+    const challengeAnswerPubsubMessageSignedPropertyNames = shuffleArray(Object.keys(challengeAnswerPubsubMessage))
     const challengeAnswerPubsubMessageSignature = await sign({
       objectToSign: challengeAnswerPubsubMessage,
       signedPropertyNames: challengeAnswerPubsubMessageSignedPropertyNames,
@@ -1064,6 +1038,7 @@ describe('protocol (node and browser)', function () {
       'pinned',
       'locked',
       'removed',
+      'protocolVersion',
       'reason',
       'commentAuthor',
     ])
@@ -1095,7 +1070,7 @@ describe('protocol (node and browser)', function () {
     }
 
     // create pubsub challenge request message signature
-    const challengeRequestPubsubMessageSignedPropertyNames = shuffleArray(['type', 'timestamp', 'challengeRequestId', 'encrypted', 'acceptedChallengeTypes'])
+    const challengeRequestPubsubMessageSignedPropertyNames = shuffleArray(Object.keys(challengeRequestPubsubMessage))
     const challengeRequestPubsubMessageSignature = await sign({
       objectToSign: challengeRequestPubsubMessage,
       signedPropertyNames: challengeRequestPubsubMessageSignedPropertyNames,
@@ -1150,7 +1125,7 @@ describe('protocol (node and browser)', function () {
     }
 
     // create pubsub challenge answer message signature
-    const challengeAnswerPubsubMessageSignedPropertyNames = shuffleArray(['type', 'timestamp', 'challengeRequestId', 'encrypted'])
+    const challengeAnswerPubsubMessageSignedPropertyNames = shuffleArray(Object.keys(challengeAnswerPubsubMessage))
     const challengeAnswerPubsubMessageSignature = await sign({
       objectToSign: challengeAnswerPubsubMessage,
       signedPropertyNames: challengeAnswerPubsubMessageSignedPropertyNames,
