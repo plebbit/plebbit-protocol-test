@@ -542,6 +542,7 @@ describe('protocol (node and browser)', function () {
       updatedAt: Math.round(Date.now() / 1000),
       statsCid: 'QmU1HXq547gXM5DpZMJubKFRKGET4MZUr5xmJj6ceASB1T',
       challenges: [],
+      postUpdates: undefined,
       protocolVersion: '1.0.0',
       encryption: {
         type: 'ed25519-aes-gcm',
