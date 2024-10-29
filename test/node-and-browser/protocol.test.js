@@ -98,7 +98,7 @@ describe('protocol (node and browser)', function () {
     console.log({comment})
 
     // encrypt publication
-    const encrypted = await encryptEd25519AesGcm(JSON.stringify({publication: comment}), pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
+    const encrypted = await encryptEd25519AesGcm(JSON.stringify({comment}), pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
 
     // create pubsub challenge request message
     const challengeRequestPubsubMessage = {
@@ -188,36 +188,32 @@ describe('protocol (node and browser)', function () {
     // decrypt challenge verification publication
     const publishedPublication = JSON.parse(
       await decryptEd25519AesGcm(challengeVerificationPubsubMessage.encrypted, pubsubMessageSigner.privateKey, subplebbitSigner.publicKey),
-    ).publication
+    )
     console.log({publishedPublication})
-    publishedCommentCid = publishedPublication.cid
+    publishedCommentCid = publishedPublication.commentUpdate.cid
+    expect(publishedCommentCid).to.be.a('string')
 
     // validate challenge verification pubsub message
-    expect(publishedPublication.author.address).to.equal(comment.author.address)
-    expect(publishedPublication.content).to.equal(comment.content)
-    expect(publishedPublication.title).to.equal(comment.title)
-    expect(publishedPublication.timestamp).to.equal(comment.timestamp)
-    expect(publishedPublication.depth).to.equal(0)
-    expect(publishedPublication.subplebbitAddress).to.equal(comment.subplebbitAddress)
-    expect(publishedPublication.signature).to.deep.equal(comment.signature)
-    expect(publishedPublication.cid).to.startWith('Qm')
+    expect(publishedPublication.comment.author.address).to.equal(comment.author.address)
+    expect(publishedPublication.comment.content).to.equal(comment.content)
+    expect(publishedPublication.comment.title).to.equal(comment.title)
+    expect(publishedPublication.comment.timestamp).to.equal(comment.timestamp)
+    expect(publishedPublication.comment.depth).to.equal(0)
+    expect(publishedPublication.comment.subplebbitAddress).to.equal(comment.subplebbitAddress)
+    expect(publishedPublication.comment.signature).to.deep.equal(comment.signature)
+    expect(publishedPublication.commentUpdate.cid).to.startWith('Qm')
     expect(challengeVerificationPubsubMessage.type).to.equal('CHALLENGEVERIFICATION')
     expect(challengeVerificationPubsubMessage.encrypted.type).to.equal('ed25519-aes-gcm')
     expect(challengeVerificationPubsubMessage.challengeSuccess).to.equal(true)
+    expect(challengeVerificationPubsubMessage.reason).to.be.undefined
+    expect(challengeVerificationPubsubMessage.challengeErrors).to.be.undefined
     expect(challengeVerificationPubsubMessage.challengeRequestId.toString()).to.equal(challengeAnswerPubsubMessage.challengeRequestId.toString())
     expect(challengeVerificationPubsubMessage.challengeAnswerId).to.equal(undefined)
 
     // validate challenge verification pubsub message subplebbit owner signature
     expect(challengeVerificationPubsubMessage.signature.type).to.equal('ed25519')
     expect(uint8ArrayToString(challengeVerificationPubsubMessage.signature.publicKey, 'base64')).to.equal(subplebbitSigner.publicKey)
-    expect(challengeVerificationPubsubMessage.signature.signedPropertyNames).to.include.members([
-      'type',
-      'challengeRequestId',
-      'challengeSuccess',
-      'encrypted',
-      'challengeErrors',
-      'reason',
-    ])
+    expect(challengeVerificationPubsubMessage.signature.signedPropertyNames).to.include.members(['type', 'challengeRequestId', 'challengeSuccess', 'encrypted'])
     expect(
       await verify({
         objectToSign: challengeVerificationPubsubMessage,
@@ -228,24 +224,24 @@ describe('protocol (node and browser)', function () {
     ).to.equal(true)
 
     // fetch published comment with ipfs
-    const commentIpfs = await fetchJson(`${ipfsGatewayUrl}/ipfs/${publishedPublication.cid}`)
+    const commentIpfs = await fetchJson(`${ipfsGatewayUrl}/ipfs/${publishedPublication.commentUpdate.cid}`)
     console.log({commentIpfs})
 
     // validate comment ipfs
-    expect(commentIpfs.author.address).to.equal(publishedPublication.author.address)
-    expect(commentIpfs.content).to.equal(publishedPublication.content)
-    expect(commentIpfs.title).to.equal(publishedPublication.title)
-    expect(commentIpfs.timestamp).to.equal(publishedPublication.timestamp)
-    expect(commentIpfs.depth).to.equal(publishedPublication.depth)
-    expect(commentIpfs.subplebbitAddress).to.equal(publishedPublication.subplebbitAddress)
-    expect(commentIpfs.signature).to.deep.equal(publishedPublication.signature)
+    expect(commentIpfs.author.address).to.equal(publishedPublication.comment.author.address)
+    expect(commentIpfs.content).to.equal(publishedPublication.comment.content)
+    expect(commentIpfs.title).to.equal(publishedPublication.comment.title)
+    expect(commentIpfs.timestamp).to.equal(publishedPublication.comment.timestamp)
+    expect(commentIpfs.depth).to.equal(publishedPublication.comment.depth)
+    expect(commentIpfs.subplebbitAddress).to.equal(publishedPublication.comment.subplebbitAddress)
+    expect(commentIpfs.signature).to.deep.equal(publishedPublication.comment.signature)
     expect(commentIpfs.cid).to.equal(undefined)
 
     // fetch commentUpdate
     // Should we add a timeout here?
     await sleep(3000)
     const subplebbitIpfs = await fetchJson(`${ipfsGatewayUrl}/ipns/${commentIpfs.subplebbitAddress}`)
-    const commentUpdate = await fetchJson(`${ipfsGatewayUrl}/ipfs/${subplebbitIpfs.postUpdates['86400']}/${publishedPublication.cid}/update`)
+    const commentUpdate = await fetchJson(`${ipfsGatewayUrl}/ipfs/${subplebbitIpfs.postUpdates['86400']}/${publishedCommentCid}/update`)
     console.log({commentUpdate})
 
     // validate comment ipns
@@ -261,21 +257,11 @@ describe('protocol (node and browser)', function () {
     // validate comment ipns signature
     expect(commentUpdate.signature.type).to.equal('ed25519')
     expect(commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
-    expect(commentUpdate.signature.signedPropertyNames).to.include.members([
-      'edit',
-      'upvoteCount',
-      'downvoteCount',
-      'replies',
-      'replyCount',
-      'flair',
-      'spoiler',
-      'pinned',
-      'locked',
-      'removed',
-      'reason',
-      'updatedAt',
-      'author',
-    ])
+    expect(commentUpdate.signature.signedPropertyNames.sort()).to.deep.equal(
+      Object.keys(commentUpdate)
+        .filter((key) => key !== 'signature')
+        .sort(),
+    )
     expect(
       await verify({
         objectToSign: commentUpdate,
@@ -305,23 +291,7 @@ describe('protocol (node and browser)', function () {
     // validate subplebbit ipns signature
     expect(subplebbitIpns.signature.type).to.equal('ed25519')
     expect(subplebbitIpns.signature.publicKey).to.equal(subplebbitSigner.publicKey)
-    expect(subplebbitIpns.signature.signedPropertyNames).to.include.members([
-      'address',
-      'title',
-      'description',
-      'roles',
-      'pubsubTopic',
-      'lastPostCid',
-      'posts',
-      'challenges',
-      'createdAt',
-      'updatedAt',
-      'features',
-      'suggested',
-      'rules',
-      'flairs',
-      'encryption',
-    ])
+    expect(subplebbitIpns.signature.signedPropertyNames).to.include.members(Object.keys(subplebbitIpns).filter((key) => key !== 'signature'))
     expect(
       await verify({
         objectToSign: subplebbitIpns,
@@ -333,15 +303,15 @@ describe('protocol (node and browser)', function () {
 
     // validate included posts
     expect(subplebbitIpns.posts.pages.hot.comments.length).to.be.greaterThan(0)
-    const pageComment = subplebbitIpns.posts.pages.hot.comments.filter((pageComment) => pageComment.comment.cid === publishedCommentCid)[0]
+    const pageComment = subplebbitIpns.posts.pages.hot.comments.filter((pageComment) => pageComment.commentUpdate.cid === publishedCommentCid)[0]
     if (pageComment) {
-      expect(pageComment.comment.cid).to.equal(publishedCommentCid)
+      expect(pageComment.commentUpdate.cid).to.equal(publishedCommentCid)
       for (const propertyName in comment) {
         expect(pageComment.comment[propertyName]).to.deep.equal(comment[propertyName])
       }
-      expect(pageComment.update.cid).to.equal(publishedCommentCid)
-      expect(typeof pageComment.update.updatedAt).to.equal('number')
-      expect(pageComment.update.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+      expect(pageComment.commentUpdate.cid).to.equal(publishedCommentCid)
+      expect(typeof pageComment.commentUpdate.updatedAt).to.equal('number')
+      expect(pageComment.commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
     } else {
       // only throw in CI because in dev we need to retry a lot and pageComment won't be in first page
       if (isCI()) {
@@ -355,7 +325,7 @@ describe('protocol (node and browser)', function () {
     maxAttempts = 200
     while (maxAttempts--) {
       pageIpfs = await fetchJson(`${ipfsGatewayUrl}/ipfs/${subplebbitIpns.posts.pageCids.new}`)
-      if (pageIpfs.comments[0]?.comment.cid === publishedCommentCid) {
+      if (pageIpfs.comments[0]?.commentUpdate.cid === publishedCommentCid) {
         break
       }
       console.log(`published comment isn't first in subplebbit page sort type 'new', retry fetching page...`)
@@ -367,13 +337,13 @@ describe('protocol (node and browser)', function () {
 
     // validate page ipfs
     expect(pageIpfs.comments.length).to.be.greaterThan(0)
-    expect(pageIpfs.comments[0].comment.cid).to.equal(publishedCommentCid)
+    expect(pageIpfs.comments[0].commentUpdate.cid).to.equal(publishedCommentCid)
     for (const propertyName in comment) {
       expect(pageIpfs.comments[0].comment[propertyName]).to.deep.equal(comment[propertyName])
     }
-    expect(pageIpfs.comments[0].update.cid).to.equal(publishedCommentCid)
-    expect(typeof pageIpfs.comments[0].update.updatedAt).to.equal('number')
-    expect(pageIpfs.comments[0].update.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+    expect(pageIpfs.comments[0].commentUpdate.cid).to.equal(publishedCommentCid)
+    expect(typeof pageIpfs.comments[0].commentUpdate.updatedAt).to.equal('number')
+    expect(pageIpfs.comments[0].commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
   })
 
   it('create reply and publish over pubsub', async () => {
@@ -389,6 +359,7 @@ describe('protocol (node and browser)', function () {
       protocolVersion: '1.0.0',
       content: 'reply content',
       author: {address: authorSigner.address},
+      postCid: publishedCommentCid,
     }
 
     // create reply signature
@@ -408,7 +379,7 @@ describe('protocol (node and browser)', function () {
     console.log({reply})
 
     // encrypt publication
-    const encryptedPublication = await encryptEd25519AesGcm(JSON.stringify({publication: reply}), pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
+    const encryptedPublication = await encryptEd25519AesGcm(JSON.stringify({comment: reply}), pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
 
     // create pubsub challenge request message
     const challengeRequestPubsubMessage = {
@@ -439,6 +410,7 @@ describe('protocol (node and browser)', function () {
     // publish pubsub challenge request message
     const challengePubsubMessage = await publishPubsubMessage(subplebbitSigner.address, challengeRequestPubsubMessage)
     console.log({challengePubsubMessage})
+    expect(challengePubsubMessage.type).to.equal('CHALLENGE')
 
     // decrypt challenges
     const challenges = JSON.parse(await decryptEd25519AesGcm(challengePubsubMessage.encrypted, pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)).challenges
@@ -478,17 +450,17 @@ describe('protocol (node and browser)', function () {
     // decrypt challenge verification publication
     const publishedPublication = JSON.parse(
       await decryptEd25519AesGcm(challengeVerificationPubsubMessage.encrypted, pubsubMessageSigner.privateKey, subplebbitSigner.publicKey),
-    ).publication
+    )
     console.log({publishedPublication})
-    const replyCid = publishedPublication.cid
+    const replyCid = publishedPublication.commentUpdate.cid
 
     // fetch parent comment update until it has reply
     let parentCommentUpdate
     let maxAttempts = 200
     await sleep(3000)
     while (maxAttempts--) {
-      const subplebbitIpfs = await fetchJson(`${ipfsGatewayUrl}/ipns/${publishedPublication.subplebbitAddress}`)
-      parentCommentUpdate = await fetchJson(`${ipfsGatewayUrl}/ipfs/${subplebbitIpfs.postUpdates['86400']}/${publishedPublication.parentCid}/update`)
+      const subplebbitIpfs = await fetchJson(`${ipfsGatewayUrl}/ipns/${publishedPublication.comment.subplebbitAddress}`)
+      parentCommentUpdate = await fetchJson(`${ipfsGatewayUrl}/ipfs/${subplebbitIpfs.postUpdates['86400']}/${publishedPublication.comment.parentCid}/update`)
       if (parentCommentUpdate?.replyCount > 0) {
         break
       }
@@ -504,13 +476,13 @@ describe('protocol (node and browser)', function () {
 
     // validate included replies
     expect(parentCommentUpdate.replies.pages.topAll.comments.length).to.equal(1)
-    expect(parentCommentUpdate.replies.pages.topAll.comments[0].comment.cid).to.equal(replyCid)
+    expect(parentCommentUpdate.replies.pages.topAll.comments[0].commentUpdate.cid).to.equal(replyCid)
     for (const propertyName in reply) {
       expect(parentCommentUpdate.replies.pages.topAll.comments[0].comment[propertyName]).to.deep.equal(reply[propertyName])
     }
-    expect(parentCommentUpdate.replies.pages.topAll.comments[0].update.cid).to.equal(replyCid)
-    expect(typeof parentCommentUpdate.replies.pages.topAll.comments[0].update.updatedAt).to.equal('number')
-    expect(parentCommentUpdate.replies.pages.topAll.comments[0].update.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+    expect(parentCommentUpdate.replies.pages.topAll.comments[0].commentUpdate.cid).to.equal(replyCid)
+    expect(typeof parentCommentUpdate.replies.pages.topAll.comments[0].commentUpdate.updatedAt).to.equal('number')
+    expect(parentCommentUpdate.replies.pages.topAll.comments[0].commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
 
     // fetch replies page ipfs
     expect(typeof parentCommentUpdate.replies.pageCids.new).to.equal('string')
@@ -519,13 +491,13 @@ describe('protocol (node and browser)', function () {
 
     // validate replies page ipfs
     expect(repliesPageIpfs.comments.length).to.equal(1)
-    expect(repliesPageIpfs.comments[0].comment.cid).to.equal(replyCid)
+    expect(repliesPageIpfs.comments[0].commentUpdate.cid).to.equal(replyCid)
     for (const propertyName in reply) {
       expect(repliesPageIpfs.comments[0].comment[propertyName]).to.deep.equal(reply[propertyName])
     }
-    expect(repliesPageIpfs.comments[0].update.cid).to.equal(replyCid)
-    expect(typeof repliesPageIpfs.comments[0].update.updatedAt).to.equal('number')
-    expect(repliesPageIpfs.comments[0].update.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+    expect(repliesPageIpfs.comments[0].commentUpdate.cid).to.equal(replyCid)
+    expect(typeof repliesPageIpfs.comments[0].commentUpdate.updatedAt).to.equal('number')
+    expect(repliesPageIpfs.comments[0].commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
   })
 
   it('create subplebbit and listen over pubsub', async () => {
@@ -603,13 +575,16 @@ describe('protocol (node and browser)', function () {
     const challengeRequestPubsubMessage = await pubsub.getMessage()
 
     // decrypt publication
-    challengeRequestPubsubMessage.publication = JSON.parse(
-      await decryptEd25519AesGcm(
-        challengeRequestPubsubMessage.encrypted,
-        subplebbitSigner.privateKey,
-        uint8ArrayToString(challengeRequestPubsubMessage.signature.publicKey, 'base64'),
+    Object.assign(
+      challengeRequestPubsubMessage,
+      JSON.parse(
+        await decryptEd25519AesGcm(
+          challengeRequestPubsubMessage.encrypted,
+          subplebbitSigner.privateKey,
+          uint8ArrayToString(challengeRequestPubsubMessage.signature.publicKey, 'base64'),
+        ),
       ),
-    ).publication
+    )
     console.log({challengeRequestPubsubMessage})
 
     // validate challenge request pubsub message
@@ -632,26 +607,25 @@ describe('protocol (node and browser)', function () {
     ).to.equal(true)
 
     // validate publication and publication signature
-    expect(challengeRequestPubsubMessage.publication.author.address).to.equal(authorSigner.address)
-    expect(challengeRequestPubsubMessage.publication.content).to.equal(createCommentOptions.content)
-    expect(challengeRequestPubsubMessage.publication.title).to.equal(createCommentOptions.title)
-    expect(challengeRequestPubsubMessage.publication.timestamp).to.equal(comment.timestamp)
-    expect(typeof challengeRequestPubsubMessage.publication.timestamp).to.equal('number')
-    expect(challengeRequestPubsubMessage.publication.subplebbitAddress).to.equal(createCommentOptions.subplebbitAddress)
-    expect(challengeRequestPubsubMessage.publication.signature.signedPropertyNames).to.include.members([
+    expect(challengeRequestPubsubMessage.comment.author.address).to.equal(authorSigner.address)
+    expect(challengeRequestPubsubMessage.comment.content).to.equal(createCommentOptions.content)
+    expect(challengeRequestPubsubMessage.comment.title).to.equal(createCommentOptions.title)
+    expect(challengeRequestPubsubMessage.comment.timestamp).to.equal(comment.timestamp)
+    expect(typeof challengeRequestPubsubMessage.comment.timestamp).to.equal('number')
+    expect(challengeRequestPubsubMessage.comment.signature.signedPropertyNames).to.include.members([
       // NOTE: flair and spoiler and not included in author signature because subplebbit mods can override it
       'author',
       'subplebbitAddress',
       'timestamp',
-      'parentCid',
+      'protocolVersion',
+      'title',
       'content',
-      'link',
     ])
     expect(
       await verify({
-        objectToSign: challengeRequestPubsubMessage.publication,
-        signedPropertyNames: challengeRequestPubsubMessage.publication.signature.signedPropertyNames,
-        signature: challengeRequestPubsubMessage.publication.signature.signature,
+        objectToSign: challengeRequestPubsubMessage.comment,
+        signedPropertyNames: challengeRequestPubsubMessage.comment.signature.signedPropertyNames,
+        signature: challengeRequestPubsubMessage.comment.signature.signature,
         publicKey: authorSigner.publicKey,
       }),
     ).to.equal(true)
@@ -723,18 +697,36 @@ describe('protocol (node and browser)', function () {
 
     // create encrypted publication
     const publicationIpfs = {
-      ...challengeRequestPubsubMessage.publication,
+      ...challengeRequestPubsubMessage.comment,
       depth: 0,
     }
     const publicationIpfsFile = await ipfsClient.add(JSON.stringify(publicationIpfs))
-    const publishedPublication = {
-      ...publicationIpfs,
+    const commentUpdateVerificationNoSignature = {
       cid: publicationIpfsFile.path,
-      postCid: publicationIpfsFile.path,
+      protocolVersion: '1.0.0',
+      author: {subplebbit: {postScore: 0, replyScore: 0, firstCommentTimestamp: Math.round(Date.now() / 1000), lastCommentCid: publicationIpfsFile.path}},
+    }
+    const commentUpdateVerificationSignedPropertyNames = Object.keys(commentUpdateVerificationNoSignature)
+    const commentUpdateVerificationSignature = await sign({
+      objectToSign: commentUpdateVerificationNoSignature,
+      signedPropertyNames: commentUpdateVerificationSignedPropertyNames,
+      privateKey: subplebbitSigner.privateKey,
+    })
+    const publishedPublication = {
+      comment: publicationIpfs,
+      commentUpdate: {
+        ...commentUpdateVerificationNoSignature,
+        signature: {
+          signature: commentUpdateVerificationSignature,
+          signedPropertyNames: commentUpdateVerificationSignedPropertyNames,
+          type: 'ed25519',
+          publicKey: subplebbitSigner.publicKey,
+        },
+      },
     }
     console.log({publishedPublication})
     const encryptedPublishedPublication = await encryptEd25519AesGcm(
-      JSON.stringify({publication: publishedPublication}),
+      JSON.stringify(publishedPublication),
       subplebbitSigner.privateKey,
       uint8ArrayToString(challengeRequestPubsubMessage.signature.publicKey, 'base64'),
     )
@@ -781,11 +773,12 @@ describe('protocol (node and browser)', function () {
 
     // validate challenge verification event
     expect(challengeVerificationEvent.challengeSuccess).to.equal(true)
-    expect(challengeVerificationEvent.publication).to.deep.equal(publishedPublication)
+    expect(challengeVerificationEvent.comment).to.deep.equal(publishedPublication.comment)
+    expect(challengeVerificationEvent.commentUpdate).to.deep.equal(publishedPublication.commentUpdate)
 
     // create commentUpdate object
     const commentUpdate = {
-      cid: publishedPublication.cid,
+      cid: publishedPublication.commentUpdate.cid,
       upvoteCount: 0,
       downvoteCount: 0,
       replyCount: 0,
@@ -809,7 +802,7 @@ describe('protocol (node and browser)', function () {
     console.log({commentUpdate})
 
     // publish post updates folder which contains the comment update
-    await ipfsClient.files.write(`/${subplebbitIpns.address}/postUpdates/86400/${publishedPublication.cid}/update`, JSON.stringify(commentUpdate), {
+    await ipfsClient.files.write(`/${subplebbitIpns.address}/postUpdates/86400/${publishedPublication.commentUpdate.cid}/update`, JSON.stringify(commentUpdate), {
       parents: true,
       create: true,
       truncate: true,
@@ -891,7 +884,7 @@ describe('protocol (node and browser)', function () {
     console.log({vote})
 
     // encrypt publication
-    const encryptedPublication = await encryptEd25519AesGcm(JSON.stringify({publication: vote}), pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
+    const encryptedPublication = await encryptEd25519AesGcm(JSON.stringify({vote}), pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
 
     // create pubsub challenge request message
     const challengeRequestPubsubMessage = {
@@ -989,15 +982,7 @@ describe('protocol (node and browser)', function () {
     // validate challenge verification pubsub message subplebbit owner signature
     expect(challengeVerificationPubsubMessage.signature.type).to.equal('ed25519')
     expect(uint8ArrayToString(challengeVerificationPubsubMessage.signature.publicKey, 'base64')).to.equal(subplebbitSigner.publicKey)
-    expect(challengeVerificationPubsubMessage.signature.signedPropertyNames).to.include.members([
-      'type',
-      'timestamp',
-      'challengeRequestId',
-      'challengeSuccess',
-      'encrypted',
-      'challengeErrors',
-      'reason',
-    ])
+    expect(challengeVerificationPubsubMessage.signature.signedPropertyNames).to.include.members(['type', 'timestamp', 'challengeRequestId', 'challengeSuccess'])
     expect(
       await verify({
         objectToSign: challengeVerificationPubsubMessage,
@@ -1058,7 +1043,7 @@ describe('protocol (node and browser)', function () {
     console.log({commentEdit})
 
     // encrypt publication
-    const encryptedPublication = await encryptEd25519AesGcm(JSON.stringify({publication: commentEdit}), pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
+    const encryptedPublication = await encryptEd25519AesGcm(JSON.stringify({commentEdit}), pubsubMessageSigner.privateKey, subplebbitSigner.publicKey)
 
     // create pubsub challenge request message
     const challengeRequestPubsubMessage = {
@@ -1156,15 +1141,7 @@ describe('protocol (node and browser)', function () {
     // validate challenge verification pubsub message subplebbit owner signature
     expect(challengeVerificationPubsubMessage.signature.type).to.equal('ed25519')
     expect(uint8ArrayToString(challengeVerificationPubsubMessage.signature.publicKey, 'base64')).to.equal(subplebbitSigner.publicKey)
-    expect(challengeVerificationPubsubMessage.signature.signedPropertyNames).to.include.members([
-      'type',
-      'timestamp',
-      'challengeRequestId',
-      'challengeSuccess',
-      'encrypted',
-      'challengeErrors',
-      'reason',
-    ])
+    expect(challengeVerificationPubsubMessage.signature.signedPropertyNames).to.include.members(['type', 'timestamp', 'challengeRequestId', 'challengeSuccess'])
     expect(
       await verify({
         objectToSign: challengeVerificationPubsubMessage,
