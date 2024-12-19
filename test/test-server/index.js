@@ -21,7 +21,7 @@ const plebbitDataPath = getTmpFolderPath()
   const plebbitOptions = {
     ipfsHttpClientsOptions: [`http://localhost:${offlineIpfs.apiPort}/api/v0`],
     pubsubHttpClientsOptions: [`http://localhost:${pubsubIpfs.apiPort}/api/v0`],
-    httpRouters: [],
+    httpRoutersOptions: [],
     // pubsubHttpClientOptions: `https://pubsubprovider.xyz/api/v0`,
     dataPath: plebbitDataPath,
     publishInterval: 1000,
