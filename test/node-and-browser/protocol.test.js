@@ -28,6 +28,7 @@ import {offlineIpfs, pubsubIpfs} from '../test-server/ipfs-config'
 const plebbitOptions = {
   ipfsHttpClientsOptions: [`http://localhost:${offlineIpfs.apiPort}/api/v0`],
   pubsubHttpClientsOptions: [`http://localhost:${pubsubIpfs.apiPort}/api/v0`],
+  httpRouters: [],
 }
 const ipfsGatewayUrl = `http://localhost:${offlineIpfs.gatewayPort}`
 console.log({plebbitOptions, ipfsGatewayUrl})
