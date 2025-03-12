@@ -19,8 +19,8 @@ const plebbitDataPath = getTmpFolderPath()
   await startIpfs(pubsubIpfs)
 
   const plebbitOptions = {
-    ipfsHttpClientsOptions: [`http://localhost:${offlineIpfs.apiPort}/api/v0`],
-    pubsubHttpClientsOptions: [`http://localhost:${pubsubIpfs.apiPort}/api/v0`],
+    kuboRpcClientsOptions: [`http://localhost:${offlineIpfs.apiPort}/api/v0`],
+    pubsubKuboRpcClientsOptions: [`http://localhost:${pubsubIpfs.apiPort}/api/v0`],
     httpRoutersOptions: [],
     // pubsubHttpClientOptions: `https://pubsubprovider.xyz/api/v0`,
     dataPath: plebbitDataPath,
@@ -34,7 +34,7 @@ const plebbitDataPath = getTmpFolderPath()
       // use the signer address as the key name to use in the tests
       keyName: signer.address,
       privateKey: signer.privateKey,
-      ipfsHttpUrl: plebbitOptions.ipfsHttpClientsOptions[0],
+      ipfsHttpUrl: plebbitOptions.kuboRpcClientsOptions[0],
     })
   }
 
