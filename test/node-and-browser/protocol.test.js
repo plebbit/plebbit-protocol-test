@@ -26,17 +26,17 @@ import {signBufferEd25519, verifyBufferEd25519} from '../utils/signature'
 import {getChallengeRequestIdFromPublicKey, generateSigner} from '../utils/crypto'
 import {offlineIpfs, pubsubIpfs} from '../test-server/ipfs-config'
 const plebbitOptions = {
-  ipfsHttpClientsOptions: [`http://localhost:${offlineIpfs.apiPort}/api/v0`],
-  pubsubHttpClientsOptions: [`http://localhost:${pubsubIpfs.apiPort}/api/v0`],
+  kuboRpcClientsOptions: [`http://localhost:${offlineIpfs.apiPort}/api/v0`],
+  pubsubKuboRpcClientsOptions: [`http://localhost:${pubsubIpfs.apiPort}/api/v0`],
   httpRoutersOptions: [],
 }
 const ipfsGatewayUrl = `http://localhost:${offlineIpfs.gatewayPort}`
 console.log({plebbitOptions, ipfsGatewayUrl})
 const pubsubIpfsClient = CreateKuboRpcClient({
-  url: plebbitOptions.pubsubHttpClientsOptions[0],
+  url: plebbitOptions.pubsubKuboRpcClientsOptions[0],
 })
 const ipfsClient = CreateKuboRpcClient({
-  url: plebbitOptions.ipfsHttpClientsOptions[0],
+  url: plebbitOptions.kuboRpcClientsOptions[0],
 })
 import signers from '../fixtures/signers'
 import {isCI} from '../utils/test-utils'
