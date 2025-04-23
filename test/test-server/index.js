@@ -3,10 +3,10 @@
 ;(await import('util')).inspect.defaultOptions.depth = null
 import Plebbit from '@plebbit/plebbit-js'
 import {directory as getTmpFolderPath} from 'tempy'
-import {startIpfs} from './start-ipfs'
-import {offlineIpfs, pubsubIpfs} from './ipfs-config'
-import signers from '../fixtures/signers'
-import {ipfsKeyImport} from '../utils/ipfs'
+import {startIpfs} from './start-ipfs.js'
+import {offlineIpfs, pubsubIpfs} from './ipfs-config.js'
+import signers from '../fixtures/signers.js'
+import {ipfsKeyImport} from '../utils/ipfs.js'
 import http from 'http'
 
 // always use the same private key and subplebbit address when testing

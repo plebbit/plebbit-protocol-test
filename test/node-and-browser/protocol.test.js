@@ -10,21 +10,21 @@ try {
   ;(await import('util')).inspect.defaultOptions.depth = null
 } catch (e) {}
 
-import {assertTestServerDidntCrash} from '../test-server/monitor-test-server'
+import {assertTestServerDidntCrash} from '../test-server/monitor-test-server.js'
 import chai from 'chai'
 import chaiString from 'chai-string'
 const {expect} = chai
 chai.use(chaiString)
 
-import Plebbit from '@plebbit/plebbit-js/dist/node/index'
+import Plebbit from '@plebbit/plebbit-js/dist/node/index.js'
 import * as cborg from 'cborg'
 import {create as CreateKuboRpcClient} from 'kubo-rpc-client'
-import {encryptEd25519AesGcm, decryptEd25519AesGcm} from '../utils/encryption'
+import {encryptEd25519AesGcm, decryptEd25519AesGcm} from '../utils/encryption.js'
 import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
 import {toString as uint8ArrayToString} from 'uint8arrays/to-string'
-import {signBufferEd25519, verifyBufferEd25519} from '../utils/signature'
-import {getChallengeRequestIdFromPublicKey, generateSigner} from '../utils/crypto'
-import {offlineIpfs, pubsubIpfs} from '../test-server/ipfs-config'
+import {signBufferEd25519, verifyBufferEd25519} from '../utils/signature.js'
+import {getChallengeRequestIdFromPublicKey, generateSigner} from '../utils/crypto.js'
+import {offlineIpfs, pubsubIpfs} from '../test-server/ipfs-config.js'
 const plebbitOptions = {
   kuboRpcClientsOptions: [`http://localhost:${offlineIpfs.apiPort}/api/v0`],
   pubsubKuboRpcClientsOptions: [`http://localhost:${pubsubIpfs.apiPort}/api/v0`],
@@ -705,7 +705,14 @@ describe('protocol (node and browser)', function () {
     const commentUpdateVerificationNoSignature = {
       cid: publicationIpfsFile.path,
       protocolVersion: '1.0.0',
-      author: {subplebbit: {postScore: 0, replyScore: 0, firstCommentTimestamp: Math.round(Date.now() / 1000), lastCommentCid: publicationIpfsFile.path}},
+      author: {
+        subplebbit: {
+          postScore: 0,
+          replyScore: 0,
+          firstCommentTimestamp: Math.round(Date.now() / 1000),
+          lastCommentCid: publicationIpfsFile.path,
+        },
+      },
     }
     const commentUpdateVerificationSignedPropertyNames = Object.keys(commentUpdateVerificationNoSignature)
     const commentUpdateVerificationSignature = await sign({
@@ -810,7 +817,9 @@ describe('protocol (node and browser)', function () {
     })
 
     const statOfPostUpdatesDirectory = await ipfsClient.files.stat(`/${subplebbitIpns.address}/postUpdates/86400`)
-    subplebbitIpns.postUpdates = {'86400': String(statOfPostUpdatesDirectory.cid)}
+    subplebbitIpns.postUpdates = {
+      86400: String(statOfPostUpdatesDirectory.cid),
+    }
 
     const subplebbitIpnsSignatureNewUpdate = await sign({
       objectToSign: subplebbitIpns,
