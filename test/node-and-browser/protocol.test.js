@@ -38,8 +38,8 @@ const pubsubIpfsClient = CreateKuboRpcClient({
 const ipfsClient = CreateKuboRpcClient({
   url: plebbitOptions.kuboRpcClientsOptions[0],
 })
-import signers from '../fixtures/signers'
-import {isCI} from '../utils/test-utils'
+import signers from '../fixtures/signers.js'
+import {isCI} from '../utils/test-utils.js'
 let plebbit
 let publishedCommentCid
 
@@ -320,31 +320,8 @@ describe('protocol (node and browser)', function () {
       }
     }
 
-    // fetch page ipfs until first comment of sort type new is published comment
-    expect(typeof subplebbitIpns.posts.pageCids.new).to.equal('string')
-    let pageIpfs
-    maxAttempts = 200
-    while (maxAttempts--) {
-      pageIpfs = await fetchJson(`${ipfsGatewayUrl}/ipfs/${subplebbitIpns.posts.pageCids.new}`)
-      if (pageIpfs.comments[0]?.commentUpdate.cid === publishedCommentCid) {
-        break
-      }
-      console.log(`published comment isn't first in subplebbit page sort type 'new', retry fetching page...`)
-      await new Promise((r) => setTimeout(r, 100)) // sleep
-      // refetch the subplebbitIpns to get updated pageCid
-      subplebbitIpns = await fetchJson(`${ipfsGatewayUrl}/ipns/${subplebbitSigner.address}`)
-    }
-    console.log({pageIpfs})
-
-    // validate page ipfs
-    expect(pageIpfs.comments.length).to.be.greaterThan(0)
-    expect(pageIpfs.comments[0].commentUpdate.cid).to.equal(publishedCommentCid)
-    for (const propertyName in comment) {
-      expect(pageIpfs.comments[0].comment[propertyName]).to.deep.equal(comment[propertyName])
-    }
-    expect(pageIpfs.comments[0].commentUpdate.cid).to.equal(publishedCommentCid)
-    expect(typeof pageIpfs.comments[0].commentUpdate.updatedAt).to.equal('number')
-    expect(pageIpfs.comments[0].commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+    // all comments in preloaded, no pageCids
+    expect(subplebbitIpns.posts?.pageCids?.new).to.be.undefined
   })
 
   it('create reply and publish over pubsub', async () => {
@@ -476,29 +453,17 @@ describe('protocol (node and browser)', function () {
     expect(typeof parentCommentUpdate.updatedAt).to.equal('number')
 
     // validate included replies
-    expect(parentCommentUpdate.replies.pages.topAll.comments.length).to.equal(1)
-    expect(parentCommentUpdate.replies.pages.topAll.comments[0].commentUpdate.cid).to.equal(replyCid)
+    expect(parentCommentUpdate.replies.pages.best.comments.length).to.equal(1)
+    expect(parentCommentUpdate.replies.pages.best.comments[0].commentUpdate.cid).to.equal(replyCid)
     for (const propertyName in reply) {
-      expect(parentCommentUpdate.replies.pages.topAll.comments[0].comment[propertyName]).to.deep.equal(reply[propertyName])
+      expect(parentCommentUpdate.replies.pages.best.comments[0].comment[propertyName]).to.deep.equal(reply[propertyName])
     }
-    expect(parentCommentUpdate.replies.pages.topAll.comments[0].commentUpdate.cid).to.equal(replyCid)
-    expect(typeof parentCommentUpdate.replies.pages.topAll.comments[0].commentUpdate.updatedAt).to.equal('number')
-    expect(parentCommentUpdate.replies.pages.topAll.comments[0].commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+    expect(parentCommentUpdate.replies.pages.best.comments[0].commentUpdate.cid).to.equal(replyCid)
+    expect(typeof parentCommentUpdate.replies.pages.best.comments[0].commentUpdate.updatedAt).to.equal('number')
+    expect(parentCommentUpdate.replies.pages.best.comments[0].commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
 
     // fetch replies page ipfs
-    expect(typeof parentCommentUpdate.replies.pageCids.new).to.equal('string')
-    const repliesPageIpfs = await fetchJson(`${ipfsGatewayUrl}/ipfs/${parentCommentUpdate.replies.pageCids.new}`)
-    console.log({repliesPageIpfs})
-
-    // validate replies page ipfs
-    expect(repliesPageIpfs.comments.length).to.equal(1)
-    expect(repliesPageIpfs.comments[0].commentUpdate.cid).to.equal(replyCid)
-    for (const propertyName in reply) {
-      expect(repliesPageIpfs.comments[0].comment[propertyName]).to.deep.equal(reply[propertyName])
-    }
-    expect(repliesPageIpfs.comments[0].commentUpdate.cid).to.equal(replyCid)
-    expect(typeof repliesPageIpfs.comments[0].commentUpdate.updatedAt).to.equal('number')
-    expect(repliesPageIpfs.comments[0].commentUpdate.signature.publicKey).to.equal(subplebbitSigner.publicKey)
+    expect(parentCommentUpdate.replies?.pageCids?.new).to.be.undefined
   })
 
   it('create subplebbit and listen over pubsub', async () => {

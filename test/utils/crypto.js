@@ -1,7 +1,7 @@
 import * as ed from '@noble/ed25519'
 import {fromString as uint8ArrayFromString} from 'uint8arrays/from-string'
 import {toString as uint8ArrayToString} from 'uint8arrays/to-string'
-import {Ed25519PublicKey, Ed25519PrivateKey} from 'libp2p-crypto/src/keys/ed25519-class'
+import {Ed25519PublicKey, Ed25519PrivateKey} from 'libp2p-crypto/src/keys/ed25519-class.js'
 import assert from 'assert'
 import PeerId from 'peer-id'
 

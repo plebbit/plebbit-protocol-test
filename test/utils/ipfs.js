@@ -1,4 +1,4 @@
-import {getIpfsKeyFromPrivateKey} from './crypto'
+import {getIpfsKeyFromPrivateKey} from './crypto.js'
 
 // ipfs http client key import is bugged
 // this function only works in node, no browser

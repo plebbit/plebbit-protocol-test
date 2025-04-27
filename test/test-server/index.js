@@ -40,8 +40,8 @@ const plebbitDataPath = getTmpFolderPath()
 
   const plebbit = await Plebbit(plebbitOptions)
   plebbit.on('error', console.log)
-  const plebbit2 = await Plebbit(plebbitOptions)
-  plebbit2.on('error', console.log)
+  const remotePlebbit = await Plebbit({...plebbitOptions, dataPath: undefined})
+  remotePlebbit.on('error', console.log)
   const signer = await plebbit.createSigner({privateKey, type: 'ed25519'})
 
   console.log(`creating subplebbit with address '${signer.address}'...`)
@@ -60,7 +60,7 @@ const plebbitDataPath = getTmpFolderPath()
     console.log(`subplebbit started with address ${signer.address}`)
 
     console.log('publish test comment')
-    const comment = await plebbit2.createComment({
+    const comment = await remotePlebbit.createComment({
       title: 'comment title',
       content: 'comment content',
       subplebbitAddress: signer.address,
