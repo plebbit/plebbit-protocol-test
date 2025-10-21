@@ -19,8 +19,8 @@ const plebbitDataPath = getTmpFolderPath()
   await startIpfs(pubsubIpfs)
 
   const plebbitOptions = {
-    kuboRpcClientsOptions: [`http://localhost:${offlineIpfs.apiPort}/api/v0`],
-    pubsubKuboRpcClientsOptions: [`http://localhost:${pubsubIpfs.apiPort}/api/v0`],
+    kuboRpcClientsOptions: [`http://127.0.0.1:${offlineIpfs.apiPort}/api/v0`],
+    pubsubKuboRpcClientsOptions: [`http://127.0.0.1:${pubsubIpfs.apiPort}/api/v0`],
     httpRoutersOptions: [],
     // pubsubHttpClientOptions: `https://pubsubprovider.xyz/api/v0`,
     dataPath: plebbitDataPath,

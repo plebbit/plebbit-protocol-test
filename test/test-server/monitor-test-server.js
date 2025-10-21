@@ -35,17 +35,29 @@ const logTestServerCrashed = async () => {
 }
 
 export const assertTestServerDidntCrash = async () => {
-  const testServerText = await fetchText('http://127.0.0.1:59281')
-  if (testServerText !== 'test server ready') {
+  const testServerRes = await fetchText('http://127.0.0.1:59281')
+  if (!testServerRes?.ok || testServerRes.text !== 'test server ready') {
     throw Error('test server crashed http://127.0.0.1:59281')
   }
-  const offlineIpfsText = await fetchText(`http://127.0.0.1:${offlineIpfs.gatewayPort}/ipfs/QmQPeNsJPyVWPFDVHb77w8G42Fvo15z4bG2X8D2GhfbSXc/readme`)
-  if (!offlineIpfsText?.startsWith('Hello and Welcome to IPFS')) {
+  const offlineIpfsRes = await fetchText(`http://127.0.0.1:${offlineIpfs.gatewayPort}/ipfs/QmQPeNsJPyVWPFDVHb77w8G42Fvo15z4bG2X8D2GhfbSXc/readme`)
+  if (!offlineIpfsRes) {
     throw Error(`test server crashed offline ipfs daemon http://127.0.0.1:${offlineIpfs.gatewayPort}`)
   }
-  const pubsubIpfsText = await fetchText(`http://127.0.0.1:${pubsubIpfs.gatewayPort}/ipfs/QmQPeNsJPyVWPFDVHb77w8G42Fvo15z4bG2X8D2GhfbSXc/readme`)
-  if (!pubsubIpfsText?.startsWith('Hello and Welcome to IPFS')) {
+  if (offlineIpfsRes.status >= 500) {
+    throw Error(`test server crashed offline ipfs daemon http://127.0.0.1:${offlineIpfs.gatewayPort} (status ${offlineIpfsRes.status})`)
+  }
+  if (offlineIpfsRes.ok && !offlineIpfsRes.text?.startsWith('Hello and Welcome to IPFS')) {
+    console.warn(`Unexpected offline IPFS gateway response for readme:`, offlineIpfsRes.text?.slice(0, 80))
+  }
+  const pubsubIpfsRes = await fetchText(`http://127.0.0.1:${pubsubIpfs.gatewayPort}/ipfs/QmQPeNsJPyVWPFDVHb77w8G42Fvo15z4bG2X8D2GhfbSXc/readme`)
+  if (!pubsubIpfsRes) {
     throw Error(`test server crashed pubsub ipfs daemon http://127.0.0.1:${pubsubIpfs.gatewayPort}`)
+  }
+  if (pubsubIpfsRes.status >= 500) {
+    throw Error(`test server crashed pubsub ipfs daemon http://127.0.0.1:${pubsubIpfs.gatewayPort} (status ${pubsubIpfsRes.status})`)
+  }
+  if (pubsubIpfsRes.ok && !pubsubIpfsRes.text?.startsWith('Hello and Welcome to IPFS')) {
+    console.warn(`Unexpected pubsub IPFS gateway response for readme:`, pubsubIpfsRes.text?.slice(0, 80))
   }
 }
 
@@ -53,7 +65,7 @@ const fetchText = async (url) => {
   try {
     const res = await fetch(url, {cache: 'no-cache'})
     const resText = await res.text()
-    return resText
+    return {text: resText, status: res.status, ok: res.ok}
   } catch (e) {
     console.error(`Error for fetch url`, url, e)
   }

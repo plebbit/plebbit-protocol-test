@@ -23,11 +23,11 @@ import {signBufferEd25519, verifyBufferEd25519} from '../utils/signature.js'
 import {getChallengeRequestIdFromPublicKey, generateSigner} from '../utils/crypto.js'
 import {offlineIpfs, pubsubIpfs} from '../test-server/ipfs-config.js'
 const plebbitOptions = {
-  kuboRpcClientsOptions: [`http://localhost:${offlineIpfs.apiPort}/api/v0`],
-  pubsubKuboRpcClientsOptions: [`http://localhost:${pubsubIpfs.apiPort}/api/v0`],
+  kuboRpcClientsOptions: [`http://127.0.0.1:${offlineIpfs.apiPort}/api/v0`],
+  pubsubKuboRpcClientsOptions: [`http://127.0.0.1:${pubsubIpfs.apiPort}/api/v0`],
   httpRoutersOptions: [],
 }
-const ipfsGatewayUrl = `http://localhost:${offlineIpfs.gatewayPort}`
+const ipfsGatewayUrl = `http://127.0.0.1:${offlineIpfs.gatewayPort}`
 console.log({plebbitOptions, ipfsGatewayUrl})
 const pubsubIpfsClient = CreateKuboRpcClient({
   url: plebbitOptions.pubsubKuboRpcClientsOptions[0],
@@ -1289,8 +1289,6 @@ function shuffleArray(array) {
 const fetchJson = async (url) => {
   const _fetchJson = () =>
     fetch(url, {
-      // ipfs tries to redirect to <cid>.localhost
-      redirect: 'manual',
       cache: 'no-cache',
     }).then(async (res) => {
       const text = await res.text()
