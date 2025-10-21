@@ -2,7 +2,7 @@
 
 import {exec, execSync} from 'child_process'
 import {directory as getTmpFolderPath} from 'tempy'
-import {path as ipfsPathFunc} from 'go-ipfs'
+import {path as ipfsPathFunc} from 'kubo'
 import assert from 'assert'
 
 const ipfsPath = ipfsPathFunc()

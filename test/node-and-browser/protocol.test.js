@@ -10,11 +10,8 @@ try {
   ;(await import('util')).inspect.defaultOptions.depth = null
 } catch (e) {}
 
+import {afterAll, afterEach, beforeAll, beforeEach, describe, expect, it} from 'vitest'
 import {assertTestServerDidntCrash} from '../test-server/monitor-test-server.js'
-import chai from 'chai'
-import chaiString from 'chai-string'
-const {expect} = chai
-chai.use(chaiString)
 
 import Plebbit from '@plebbit/plebbit-js'
 import * as cborg from 'cborg'
@@ -45,17 +42,17 @@ let publishedCommentCid
 
 // uncomment to test flakiness
 // let i = 100; while (--i)
-describe('protocol (node and browser)', function () {
+describe('protocol (node and browser)', () => {
   // retry because sometimes CI is flaky
   // if (isCI()) {
   //   this.retries(3)
   // }
 
-  before(async () => {
+  beforeAll(async () => {
     plebbit = await Plebbit(plebbitOptions)
     plebbit.on('error', console.error)
   })
-  after(async () => {
+  afterAll(async () => {
     await plebbit.destroy()
   })
 
@@ -202,7 +199,7 @@ describe('protocol (node and browser)', function () {
     expect(publishedPublication.comment.depth).to.equal(0)
     expect(publishedPublication.comment.subplebbitAddress).to.equal(comment.subplebbitAddress)
     expect(publishedPublication.comment.signature).to.deep.equal(comment.signature)
-    expect(publishedPublication.commentUpdate.cid).to.startWith('Qm')
+    expect(publishedPublication.commentUpdate.cid.startsWith('Qm')).toBe(true)
     expect(challengeVerificationPubsubMessage.type).to.equal('CHALLENGEVERIFICATION')
     expect(challengeVerificationPubsubMessage.encrypted.type).to.equal('ed25519-aes-gcm')
     expect(challengeVerificationPubsubMessage.challengeSuccess).to.equal(true)

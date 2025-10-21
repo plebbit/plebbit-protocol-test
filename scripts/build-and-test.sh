@@ -7,14 +7,14 @@ kill `pgrep --full  'ipfs daemon'`
 
 # build and bundle
 yarn
-yarn webpack
+npx playwright install --with-deps chromium firefox
 
 # wait until test server is ready
 yarn test:server & yarn test:server:wait-on
 
 # tests
 yarn test
-CHROME_BIN=$(which chrome || which chromium) FIREFOX_BIN=$(which firefox) yarn test:browser
+yarn test:browser
 
 # close test server
 kill `pgrep --full  'node test/test-server'`

@@ -35,14 +35,13 @@ jobs:
           - 18
 
     steps:
-      - run: sudo apt install -y xvfb
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node_version }}
 
       - run: yarn install --frozen-lockfile
-      - run: yarn webpack
+      - run: npx playwright install --with-deps chromium firefox
 
       # disable hosts we shouldn't use
       - run: sudo echo "255.255.255.255 cloudflare-ipfs.com" | sudo tee -a /etc/hosts
@@ -50,4 +49,4 @@ jobs:
 
       - run: yarn test:server & yarn test:server:wait-on
       - run: yarn test
-      - run: CHROME_BIN=$(which chrome) FIREFOX_BIN=$(which firefox) yarn test:browser
+      - run: yarn test:browser

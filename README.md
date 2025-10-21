@@ -8,9 +8,13 @@ This repo contains extra tests for `plebbit-js` (https://github.com/plebbit/pleb
 
 - `yarn test`
 
-#### Bundle browser tests in watch mode
+#### Watch node tests
 
-- `yarn webpack:watch`
+- `yarn test:watch`
+
+#### Install Playwright browsers (first run)
+
+- `npx playwright install --with-deps chromium firefox`
 
 #### Browser tests
 

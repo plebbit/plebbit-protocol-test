@@ -1,8 +1,9 @@
+import {afterAll, beforeAll, describe} from 'vitest'
 import Plebbit from '@plebbit/plebbit-js'
 
 // put node only tests here
 
 describe('protocol (node)', () => {
-  before(async () => {})
-  after(async () => {})
+  beforeAll(async () => {})
+  afterAll(async () => {})
 })

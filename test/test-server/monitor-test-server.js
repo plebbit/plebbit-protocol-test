@@ -17,7 +17,7 @@ const startMonitoring = async () => {
   }, 200).unref?.()
 }
 
-// make sure only one instance is running in karma
+// make sure only one instance is running in browser environments (Playwright)
 try {
   if (!window.PLEBBIT_MONITOR_TEST_SERVER_STARTED) {
     startMonitoring()
