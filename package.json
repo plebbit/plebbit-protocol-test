@@ -14,11 +14,10 @@
     "prettier": "prettier {src,test,config}/**/*.{cjs,js,jsx,ts,tsx} --config config/prettier.config.js --write"
   },
   "dependencies": {
-    "@plebbit/plebbit-js": "../plebbit-js",
     "cborg": "1.9.6",
     "eslint": "8.4.1",
     "husky": "4.3.8",
-    "kubo": "0.38.1",
+    "kubo": "0.39.0",
     "lint-staged": "12.3.8",
     "prettier": "3.2.5",
     "tempy": "1.0.1",
