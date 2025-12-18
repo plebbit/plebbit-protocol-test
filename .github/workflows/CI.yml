@@ -10,7 +10,7 @@ on:
       - 'config/**'
       - '.github/**'
       - 'package.json'
-      - 'yarn.lock'
+      - 'package-lock.json'
   push:
     branches:
       - master
@@ -19,7 +19,7 @@ on:
       - 'config/**'
       - '.github/**'
       - 'package.json'
-      - 'yarn.lock'
+      - 'package-lock.json'
 
 jobs:
   test:
@@ -40,13 +40,13 @@ jobs:
         with:
           node-version: ${{ matrix.node_version }}
 
-      - run: yarn install --frozen-lockfile
+      - run: npm ci
       - run: npx playwright install --with-deps chromium firefox
 
       # disable hosts we shouldn't use
       - run: sudo echo "255.255.255.255 cloudflare-ipfs.com" | sudo tee -a /etc/hosts
       - run: sudo echo "255.255.255.255 pubsubprovider.xyz" | sudo tee -a /etc/hosts
 
-      - run: yarn test:server & yarn test:server:wait-on
-      - run: yarn test
-      - run: yarn test:browser
+      - run: npm run test:server & npm run test:server:wait-on
+      - run: npm run test
+      - run: npm run test:browser

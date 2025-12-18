@@ -7,7 +7,7 @@
   "scripts": {
     "test": "vitest run --config vitest.config.js",
     "test:watch": "vitest --config vitest.config.js",
-    "test:browser": "yarn test:browser:chromium && yarn test:browser:firefox",
+    "test:browser": "npm run test:browser:chromium && npm run test:browser:firefox",
     "test:browser:chromium": "cross-env VITEST_BROWSER=chromium vitest --run --browser --config config/vitest.browser.config.js",
     "test:browser:firefox": "cross-env VITEST_BROWSER=firefox vitest --run --browser --config config/vitest.browser.config.js",
     "test:server": "rm -rf .plebbit/ && node --es-module-specifier-resolution=node test/test-server",

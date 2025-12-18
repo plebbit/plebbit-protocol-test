@@ -2,15 +2,15 @@ This repo contains extra tests for `plebbit-js` (https://github.com/plebbit/pleb
 
 #### Install
 
-- `yarn`
+- `npm install`
 
 #### Node tests
 
-- `yarn test`
+- `npm run test`
 
 #### Watch node tests
 
-- `yarn test:watch`
+- `npm run test:watch`
 
 #### Install Playwright browsers (first run)
 
@@ -18,10 +18,10 @@ This repo contains extra tests for `plebbit-js` (https://github.com/plebbit/pleb
 
 #### Browser tests
 
-- `yarn test:browser`
+- `npm run test:browser`
 
 #### Tests with plebbit-js logs
 
 ```
-DEBUG=plebbit-js:* yarn test
+DEBUG=plebbit-js:* npm run test
 ```
