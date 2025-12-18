@@ -73,7 +73,7 @@ const plebbitDataPath = getTmpFolderPath()
     // comment.once('challengeverification', async (challengeVerification) => {
     //   const commentCid = challengeVerification.publication.cid
     //   console.log({commentCid})
-    //   const comment = await plebbit.getComment(commentCid)
+    //   const comment = await plebbit.getComment({cid: commentCid})
     //   console.log({comment})
     //   comment.on('update', console.log)
     //   comment.update()
